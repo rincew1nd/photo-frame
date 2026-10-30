@@ -61,7 +61,11 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
     super.dispose();
   }
 
-  void _schedulePreload(SlideshowViewState state, AppSettings settings) {
+  void _schedulePreload(
+    SlideshowViewState state,
+    AppSettings settings,
+    bool liveSupported,
+  ) {
     if (!ref.read(preloadMediaProvider)) {
       return;
     }
@@ -76,6 +80,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
     final type = cached.type;
     final wantsLive =
         type == MediaKind.livePhoto &&
+        liveSupported &&
         settings.playback.livePhotoMode != LivePhotoMode.off;
     final wantsVideo =
         type == MediaKind.video &&
@@ -270,6 +275,11 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
     final fit = resolver.effectiveFit(current);
     final kind = cached?.type ?? current?.type ?? MediaKind.photo;
     final isVideo = kind == MediaKind.video;
+    final liveSupported =
+        ref.watch(livePhotoMotionSupportProvider).value ?? true;
+    final liveMode = liveSupported
+        ? settings.playback.livePhotoMode
+        : LivePhotoMode.off;
     final showsOverlays =
         !state.nightMode || !settings.nightMode.hideOverlays;
     final motion =
@@ -286,10 +296,11 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
       state.progress,
       settings,
       state.playing,
+      liveMode,
     );
     // Build the current slide first so it can claim a finished preload before
     // scheduling the one for the new next asset.
-    _schedulePreload(state, settings);
+    _schedulePreload(state, settings, liveSupported);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _toggleControls,
@@ -397,6 +408,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
     double progress,
     AppSettings settings,
     bool playing,
+    LivePhotoMode liveMode,
   ) {
     if (cached == null) {
       return _missingImage();
@@ -446,7 +458,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
       );
     }
     if (cached.type == MediaKind.livePhoto &&
-        settings.playback.livePhotoMode != LivePhotoMode.off) {
+        liveMode != LivePhotoMode.off) {
       return _KenBurns(
         key: ValueKey<String>(
           'ken-burns-live-${cached.id}-${profile.panStrength}-$imageAspect',
@@ -460,7 +472,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
         child: LivePhotoSlide(
           key: ValueKey<String>('live-${cached.id}'),
           preloadedPlayback: _claimPreloaded(cached.id),
-          mode: settings.playback.livePhotoMode,
+          mode: liveMode,
           sourceBuilder: () => _livePlaybackSourceFor(cached),
           muted: settings.playback.muted,
           playing: playing,

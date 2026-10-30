@@ -28,6 +28,27 @@ abstract class SingleInstanceService {
   Future<void> release();
 }
 
+abstract class LivePhotoMotionSupport {
+  Future<bool> get supported;
+}
+
+class PlatformLivePhotoMotionSupport implements LivePhotoMotionSupport {
+  const PlatformLivePhotoMotionSupport();
+  static const MethodChannel _channel = MethodChannel(
+    'com.rincew1nd.photoframe/platform',
+  );
+
+  @override
+  Future<bool> get supported async {
+    if (!Platform.isAndroid) return true;
+    try {
+      return await _channel.invokeMethod<bool>('supportsHevc1440p') ?? false;
+    } on Object {
+      return false;
+    }
+  }
+}
+
 class WakelockKeepAwake implements KeepAwakeService {
   const WakelockKeepAwake();
 
@@ -148,12 +169,14 @@ class PlatformServices {
     required this.fullscreen,
     required this.biometrics,
     required this.singleInstance,
+    required this.livePhotoMotion,
   });
 
   final KeepAwakeService keepAwake;
   final FullscreenService fullscreen;
   final BiometricsService biometrics;
   final SingleInstanceService singleInstance;
+  final LivePhotoMotionSupport livePhotoMotion;
 
   factory PlatformServices.create(AppPaths paths) {
     final fullscreen = Platform.isWindows || Platform.isLinux
@@ -166,6 +189,7 @@ class PlatformServices {
       fullscreen: fullscreen,
       biometrics: LocalAuthBiometrics(),
       singleInstance: FileLockSingleInstance(paths),
+      livePhotoMotion: const PlatformLivePhotoMotionSupport(),
     );
   }
 }

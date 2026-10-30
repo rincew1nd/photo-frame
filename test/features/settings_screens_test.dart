@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photoframe/app/providers.dart';
 import 'package:photoframe/core/logging/app_logger.dart';
@@ -19,6 +20,7 @@ Future<void> _pump(
   required InMemorySettingsRepository repository,
   required Widget screen,
   CacheStore? cacheStore,
+  List<Override> overrides = const <Override>[],
 }) async {
   await tester.binding.setSurfaceSize(const Size(1200, 3000));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -28,6 +30,7 @@ Future<void> _pump(
         settingsRepositoryProvider.overrideWithValue(repository),
         cacheStoreProvider.overrideWithValue(cacheStore ?? MemoryCacheStore()),
         appLoggerProvider.overrideWithValue(AppLogger()),
+        ...overrides,
       ],
       child: MaterialApp(
         locale: const Locale('en'),
@@ -126,6 +129,45 @@ void main() {
     await tester.tap(muteSwitch);
     await tester.pumpAndSettle();
     expect((await repository.load()).playback.muted, isFalse);
+  });
+
+  testWidgets('playback screen disables live photo motion without support', (
+    tester,
+  ) async {
+    final repository = InMemorySettingsRepository(
+      const AppSettings(
+        playback: PlaybackSettings(livePhotoMode: LivePhotoMode.bounce),
+      ),
+    );
+    await _pump(
+      tester,
+      repository: repository,
+      screen: const PlaybackSettingsScreen(),
+      overrides: [
+        livePhotoMotionSupportProvider.overrideWith(
+          (ref) => Future<bool>.value(false),
+        ),
+      ],
+    );
+
+    expect(find.text('Device is not supported'), findsOneWidget);
+
+    expect(
+      tester
+          .widget<RadioListTile<LivePhotoMode>>(
+            find.byKey(const ValueKey<String>('live-photo-mode-bounce')),
+          )
+          .enabled,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<RadioListTile<LivePhotoMode>>(
+            find.byKey(const ValueKey<String>('live-photo-mode-off')),
+          )
+          .enabled,
+      isTrue,
+    );
   });
 
   testWidgets('slideshow screen saves the default profile', (tester) async {

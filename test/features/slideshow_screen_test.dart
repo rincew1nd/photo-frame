@@ -1061,6 +1061,47 @@ void main() {
     expect(find.byType(Image), findsWidgets);
   });
 
+  testWidgets('shows the still when live photo motion is unsupported', (
+    tester,
+  ) async {
+    final dir = _tempDir();
+    final first = _image(dir, 'live');
+    final motion = File('${dir.path}/motion.mov')
+      ..writeAsBytesSync(<int>[0, 1, 2]);
+    final fake = FakeMediaPlayback();
+    addTearDown(fake.dispose);
+    await _pump(
+      tester,
+      SlideshowViewState(
+        assets: const <ImmichAsset>[
+          ImmichAsset(id: 'lp1', type: MediaKind.livePhoto),
+        ],
+        current: const ImmichAsset(id: 'lp1', type: MediaKind.livePhoto),
+        playing: true,
+        loading: false,
+        cached: <CachedAsset>[
+          _cached(
+            'lp1',
+            first,
+          ).copyWith(type: MediaKind.livePhoto, liveVideoPath: motion.path),
+        ],
+      ),
+      settings: const AppSettings(
+        overlays: OverlaySettings(clock: false),
+        defaultProfile: AspectProfile(imageMotion: false),
+        playback: PlaybackSettings(livePhotoMode: LivePhotoMode.loop),
+      ),
+      overrides: [
+        livePhotoMotionSupportProvider.overrideWith(
+          (ref) => Future<bool>.value(false),
+        ),
+        mediaPlaybackFactoryProvider.overrideWithValue(() => fake),
+      ],
+    );
+    expect(find.text('fake-video'), findsNothing);
+    expect(find.byType(Image), findsWidgets);
+  });
+
   testWidgets('live photo plays once then returns to the still', (tester) async {
     final dir = _tempDir();
     final first = _image(dir, 'live');

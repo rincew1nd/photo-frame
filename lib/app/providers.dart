@@ -50,6 +50,10 @@ final Provider<CacheStore> cacheStoreProvider = Provider<CacheStore>(
 final Provider<PlatformServices> platformServicesProvider =
     Provider<PlatformServices>((ref) => ref.watch(bootstrapProvider).platform);
 
+final FutureProvider<bool> livePhotoMotionSupportProvider = FutureProvider<bool>(
+  (ref) => ref.watch(platformServicesProvider).livePhotoMotion.supported,
+);
+
 final Provider<MediaPlaybackFactory> mediaPlaybackFactoryProvider =
     Provider<MediaPlaybackFactory>((ref) => MediaKitPlayback.new);
 

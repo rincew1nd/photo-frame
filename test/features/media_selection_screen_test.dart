@@ -76,6 +76,7 @@ PlatformServices _services() {
     fullscreen: const UnsupportedFullscreen(),
     biometrics: _NoBiometrics(),
     singleInstance: _NoopSingleInstance(),
+    livePhotoMotion: const PlatformLivePhotoMotionSupport(),
   );
 }
 
