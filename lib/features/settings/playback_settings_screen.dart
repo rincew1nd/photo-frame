@@ -157,6 +157,8 @@ class PlaybackSettingsScreen extends ConsumerWidget {
       LivePhotoMode.off => 'Show as a still photo.',
       LivePhotoMode.live => 'Play the motion once, then show the still.',
       LivePhotoMode.loop => 'Repeat the motion while the slide is visible.',
+      LivePhotoMode.bounce =>
+        'Play the motion forward and backward while the slide is visible.',
     };
   }
 }

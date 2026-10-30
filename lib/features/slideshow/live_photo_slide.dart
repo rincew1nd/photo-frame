@@ -14,6 +14,7 @@ class LivePhotoSlide extends ConsumerStatefulWidget {
     required this.playing,
     required this.fit,
     required this.still,
+    this.preloadedPlayback,
   });
 
   final LivePhotoMode mode;
@@ -22,6 +23,7 @@ class LivePhotoSlide extends ConsumerStatefulWidget {
   final bool playing;
   final BoxFit fit;
   final Widget still;
+  final MediaPlayback? preloadedPlayback;
 
   @override
   ConsumerState<LivePhotoSlide> createState() => _LivePhotoSlideState();
@@ -48,6 +50,19 @@ class _LivePhotoSlideState extends ConsumerState<LivePhotoSlide> {
     if (widget.mode == LivePhotoMode.off || _showStill) {
       return widget.still;
     }
+    if (widget.mode == LivePhotoMode.bounce) {
+      return VideoSlide(
+        key: const ValueKey<String>('live-bounce'),
+        sourceBuilder: widget.sourceBuilder,
+        bounce: true,
+        loop: false,
+        muted: widget.muted,
+        playing: widget.playing,
+        fit: widget.fit,
+        fallback: widget.still,
+        preloadedPlayback: widget.preloadedPlayback,
+      );
+    }
     if (widget.mode == LivePhotoMode.loop) {
       return VideoSlide(
         key: const ValueKey<String>('live-loop'),
@@ -57,6 +72,7 @@ class _LivePhotoSlideState extends ConsumerState<LivePhotoSlide> {
         playing: widget.playing,
         fit: widget.fit,
         fallback: widget.still,
+        preloadedPlayback: widget.preloadedPlayback,
       );
     }
     return VideoSlide(
@@ -67,6 +83,7 @@ class _LivePhotoSlideState extends ConsumerState<LivePhotoSlide> {
       playing: widget.playing,
       fit: widget.fit,
       fallback: widget.still,
+      preloadedPlayback: widget.preloadedPlayback,
       onCompleted: () {
         if (mounted) {
           setState(() => _showStill = true);

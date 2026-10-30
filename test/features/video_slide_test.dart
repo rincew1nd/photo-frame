@@ -29,6 +29,7 @@ VideoSlide _slide({
   bool muted = true,
   bool playing = false,
   bool loop = false,
+  bool bounce = false,
   VoidCallback? onCompleted,
   ValueChanged<String>? onError,
 }) {
@@ -42,6 +43,7 @@ VideoSlide _slide({
     fit: BoxFit.cover,
     fallback: const Text('fallback'),
     loop: loop,
+    bounce: bounce,
     onCompleted: onCompleted,
     onError: onError,
   );
@@ -162,6 +164,53 @@ void main() {
     expect(fake.lastSeek, Duration.zero);
     expect(fake.playCalls, 1);
     expect(fake.playing, isTrue);
+  });
+
+  testWidgets('bounce reverses on completion then resumes forward', (
+    tester,
+  ) async {
+    final fake = FakeMediaPlayback();
+    addTearDown(fake.dispose);
+    var completions = 0;
+
+    await _pump(
+      tester,
+      fake,
+      _slide(playing: true, bounce: true, onCompleted: () => completions++),
+    );
+
+    const duration = Duration(seconds: 2);
+    fake.emit(
+      const PlaybackSnapshot(
+        phase: PlaybackPhase.completed,
+        duration: duration,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(fake.reverse, isTrue);
+    expect(fake.reverseCalls, 1);
+    expect(
+      fake.lastSeek,
+      duration - const Duration(milliseconds: 1),
+    );
+    expect(fake.playCalls, 1);
+
+    fake.emit(
+      const PlaybackSnapshot(
+        phase: PlaybackPhase.completed,
+        duration: duration,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(fake.reverse, isFalse);
+    expect(fake.reverseCalls, 2);
+    expect(fake.lastSeek, Duration.zero);
+    expect(fake.playCalls, 2);
+    expect(completions, 0);
   });
 
   testWidgets('failed playback renders fallback and reports the error', (
@@ -318,6 +367,47 @@ void main() {
 
     await _pump(tester, fake, _slide());
     expect(fake.disposed, isFalse);
+
+    await tester.pumpWidget(const SizedBox());
+    expect(fake.disposed, isTrue);
+  });
+
+  testWidgets('uses a preloaded playback without reopening', (tester) async {
+    final fake = FakeMediaPlayback();
+    addTearDown(fake.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          mediaPlaybackFactoryProvider.overrideWithValue(
+            () => fail('preloaded playback must be reused'),
+          ),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: VideoSlide(
+              preloadedPlayback: fake,
+              sourceBuilder: () async =>
+                  const PlaybackSource(uri: 'file:///video.mp4'),
+              muted: false,
+              playing: true,
+              fit: BoxFit.cover,
+              fallback: const Text('fallback'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(fake.openedSource, isNull);
+    expect(fake.muted, isFalse);
+    expect(fake.playCalls, 1);
+
+    fake.emit(const PlaybackSnapshot(phase: PlaybackPhase.paused));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('fake-video'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
     expect(fake.disposed, isTrue);

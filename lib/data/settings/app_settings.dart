@@ -76,7 +76,8 @@ enum ImageFit {
 enum LivePhotoMode {
   off,
   live,
-  loop;
+  loop,
+  bounce;
 
   static LivePhotoMode fromJson(Object? value) {
     return _enumByName(LivePhotoMode.values, value, LivePhotoMode.off);

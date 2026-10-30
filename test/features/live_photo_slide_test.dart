@@ -105,6 +105,44 @@ void main() {
     expect(find.text('still'), findsOneWidget);
   });
 
+  testWidgets('bounce keeps motion instead of returning to the still', (
+    tester,
+  ) async {
+    final fake = FakeMediaPlayback();
+    addTearDown(fake.dispose);
+
+    await _pump(tester, _slide(mode: LivePhotoMode.bounce), () => fake);
+
+    expect(find.text('fake-video'), findsOneWidget);
+
+    const duration = Duration(seconds: 2);
+    fake.emit(
+      const PlaybackSnapshot(
+        phase: PlaybackPhase.completed,
+        duration: duration,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(fake.reverse, isTrue);
+    expect(find.text('fake-video'), findsOneWidget);
+
+    fake.emit(
+      const PlaybackSnapshot(
+        phase: PlaybackPhase.completed,
+        duration: duration,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(fake.reverse, isFalse);
+    expect(fake.lastSeek, Duration.zero);
+    expect(find.text('fake-video'), findsOneWidget);
+    expect(find.text('still'), findsOneWidget);
+  });
+
   testWidgets('null source renders the still without opening', (tester) async {
     final fake = FakeMediaPlayback();
     addTearDown(fake.dispose);

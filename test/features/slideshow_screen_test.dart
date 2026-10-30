@@ -202,6 +202,7 @@ Future<_FakeSlideshowController> _pump(
   Size size = const Size(800, 600),
   AppSettings? settings,
   InMemorySettingsRepository? repository,
+  bool preload = false,
   List<Override> overrides = const <Override>[],
 }) async {
   await tester.binding.setSurfaceSize(size);
@@ -217,6 +218,7 @@ Future<_FakeSlideshowController> _pump(
         settingsRepositoryProvider.overrideWithValue(
           repository ?? InMemorySettingsRepository(settings ?? _settings()),
         ),
+        preloadMediaProvider.overrideWithValue(preload),
         ...overrides,
       ],
       child: const MaterialApp(home: SlideshowScreen()),
@@ -1097,6 +1099,60 @@ void main() {
     expect(find.text('fake-video'), findsNothing);
     expect(find.byType(Image), findsWidgets);
     expect(find.text('Live Photo motion in Phase 3'), findsNothing);
+  });
+
+  testWidgets('preloads the next live photo player paused', (tester) async {
+    final dir = _tempDir();
+    final first = _image(dir, 'first');
+    final still = _image(dir, 'next-live');
+    final motion = File('${dir.path}/next-motion.mov')
+      ..writeAsBytesSync(<int>[0, 1, 2]);
+    final fakes = <FakeMediaPlayback>[];
+    FakeMediaPlayback factory() {
+      final fake = FakeMediaPlayback();
+      fakes.add(fake);
+      return fake;
+    }
+
+    addTearDown(() {
+      for (final fake in fakes) {
+        fake.dispose();
+      }
+    });
+
+    await _pump(
+      tester,
+      SlideshowViewState(
+        assets: const <ImmichAsset>[
+          ImmichAsset(id: 'p1'),
+          ImmichAsset(id: 'lp2', type: MediaKind.livePhoto),
+        ],
+        current: const ImmichAsset(id: 'p1'),
+        currentIndex: 0,
+        playing: true,
+        loading: false,
+        cached: <CachedAsset>[
+          _cached('p1', first),
+          _cached('lp2', still).copyWith(
+            type: MediaKind.livePhoto,
+            liveVideoPath: motion.path,
+          ),
+        ],
+      ),
+      preload: true,
+      settings: const AppSettings(
+        overlays: OverlaySettings(clock: false),
+        defaultProfile: AspectProfile(imageMotion: false),
+        playback: PlaybackSettings(livePhotoMode: LivePhotoMode.loop),
+      ),
+      overrides: [mediaPlaybackFactoryProvider.overrideWithValue(factory)],
+    );
+
+    expect(fakes, hasLength(1));
+    final preloaded = fakes.single;
+    expect(preloaded.openedSource?.uri, motion.path);
+    expect(preloaded.openedAutoPlay, isFalse);
+    expect(find.text('fake-video'), findsNothing);
   });
 
   testWidgets('requests weather on first frame when enabled', (tester) async {

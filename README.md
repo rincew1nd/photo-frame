@@ -25,7 +25,7 @@ Implemented:
   (libheif) and DNG, including ProRAW where LibRaw supports the variant, with a display-sized derived
   JPEG cache and the Immich preview fallback; videos use cached originals for playback.
 - Video playback with audio and mute (`VideoPlaybackMode.full`); `off` and `staticPreview` remain.
-- Live Photo Off/Live/Loop motion playback with a still fallback.
+- Live Photo Off/Live/Loop/Bounce motion playback with a still fallback.
 - Ken Burns pan/zoom, contain/cover fitting, and adaptive backgrounds (ambient glow or blurred cover).
 - Disk cache with checksum verification, resume, LRU eviction, quota, and offline playback.
 - Clock, weather, and EXIF overlays; night mode; settings screens.
@@ -54,8 +54,8 @@ preview-sized image for every asset, an original for stills, and video originals
 motion for playback. At display time, formats Flutter can decode (JPEG, PNG, WebP, GIF, BMP) use the
 original with the preview as a fallback; other still formats use a display-sized derived JPEG from
 the native decoders when available, otherwise the Immich preview. Videos play from the cached
-original with audio and mute control, and Live Photos play motion (Off/Live/Loop) with a still
-fallback.
+original with audio and mute control, and Live Photos play motion (Off/Live/Loop/Bounce) with a
+still fallback. Bounce plays the motion forward then backward while the slide is visible.
 
 ## Requirements and toolchains
 

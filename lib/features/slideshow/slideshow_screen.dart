@@ -31,6 +31,9 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
   bool _controlsVisible = false;
   bool _weatherRequested = false;
   String? _derivationAssetId;
+  MediaPlayback? _preloadedPlayback;
+  String? _preloadedAssetId;
+  String? _preloadingAssetId;
 
   @override
   void initState() {
@@ -45,6 +48,99 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
         ref.read(slideshowControllerProvider.notifier).refreshWeather();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    final preloaded = _preloadedPlayback;
+    _preloadedPlayback = null;
+    _preloadedAssetId = null;
+    if (preloaded != null) {
+      unawaited(preloaded.dispose());
+    }
+    super.dispose();
+  }
+
+  void _schedulePreload(SlideshowViewState state, AppSettings settings) {
+    if (!ref.read(preloadMediaProvider)) {
+      return;
+    }
+    if (state.assets.length < 2) {
+      return;
+    }
+    final next = state.assets[(state.currentIndex + 1) % state.assets.length];
+    final cached = _cachedFor(next.id, state.cached);
+    if (cached == null) {
+      return;
+    }
+    final type = cached.type;
+    final wantsLive =
+        type == MediaKind.livePhoto &&
+        settings.playback.livePhotoMode != LivePhotoMode.off;
+    final wantsVideo =
+        type == MediaKind.video &&
+        settings.playback.videoPlaybackMode == VideoPlaybackMode.full;
+    if (!wantsLive && !wantsVideo) {
+      return;
+    }
+    if (_preloadedAssetId == next.id || _preloadingAssetId == next.id) {
+      return;
+    }
+    final previous = _preloadedPlayback;
+    _preloadedPlayback = null;
+    _preloadedAssetId = null;
+    if (previous != null) {
+      unawaited(previous.dispose());
+    }
+    _preloadingAssetId = next.id;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || _preloadingAssetId != next.id) {
+        return;
+      }
+      final source = await (wantsLive
+          ? _livePlaybackSourceFor(cached)
+          : _playbackSourceFor(cached));
+      if (!mounted || _preloadingAssetId != next.id) {
+        return;
+      }
+      if (source == null) {
+        _preloadingAssetId = null;
+        return;
+      }
+      final playback = ref.read(mediaPlaybackFactoryProvider)();
+      try {
+        await playback.open(
+          source,
+          muted: settings.playback.muted,
+          autoPlay: false,
+        );
+      } on Object {
+        // ponytail: a failed preload falls back to on-slide startup
+      }
+      // Keep it only while the asset that will consume it is still next.
+      final currentId = ref.read(slideshowControllerProvider).value?.current?.id;
+      if (mounted && _preloadingAssetId == next.id && currentId != next.id) {
+        _preloadedPlayback = playback;
+        _preloadedAssetId = next.id;
+        _preloadingAssetId = null;
+        setState(() {});
+        return;
+      }
+      if (_preloadingAssetId == next.id) {
+        _preloadingAssetId = null;
+      }
+      unawaited(playback.dispose());
+    });
+  }
+
+  MediaPlayback? _claimPreloaded(String assetId) {
+    if (_preloadedAssetId != assetId) {
+      return null;
+    }
+    final playback = _preloadedPlayback;
+    _preloadedAssetId = null;
+    _preloadedPlayback = null;
+    return playback;
   }
 
   void _toggleControls() {
@@ -191,6 +287,9 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
       settings,
       state.playing,
     );
+    // Build the current slide first so it can claim a finished preload before
+    // scheduling the one for the new next asset.
+    _schedulePreload(state, settings);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _toggleControls,
@@ -319,6 +418,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
         settings.playback.videoPlaybackMode == VideoPlaybackMode.full) {
       final video = VideoSlide(
         key: ValueKey<String>('video-${cached.id}'),
+        preloadedPlayback: _claimPreloaded(cached.id),
         sourceBuilder: () => _playbackSourceFor(cached),
         fallbackSourceBuilder: () => _videoFallbackSourceFor(cached),
         muted: settings.playback.muted,
@@ -359,6 +459,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
         progress: progress,
         child: LivePhotoSlide(
           key: ValueKey<String>('live-${cached.id}'),
+          preloadedPlayback: _claimPreloaded(cached.id),
           mode: settings.playback.livePhotoMode,
           sourceBuilder: () => _livePlaybackSourceFor(cached),
           muted: settings.playback.muted,

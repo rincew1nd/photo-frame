@@ -22,7 +22,9 @@ Related: [`architecture.md`](architecture.md), [`data-cache.md`](data-cache.md),
 - Hardware decode: enabled where available; automatic fallback to software.
 - Audio: decoded by libmpv; mute/volume follows app state. No HTML5 autoplay restrictions.
 - Live Photo: the still is displayed, then the associated motion video is played with its audio.
-  Modes: Off (still only), Live (play once, then still), Loop (repeat while the slide is visible).
+  Modes: Off (still only), Live (play once, then still), Loop (repeat while the slide is visible),
+  Bounce (forward then backward while the slide is visible; falls back to forward looping when
+  libmpv's `play-direction` property is unavailable).
 - Video duration controls the slide duration; the slideshow advances on end.
 - Progress, pause/resume, mute/unmute, next/previous are domain actions; they do not depend on
   player-specific UI.

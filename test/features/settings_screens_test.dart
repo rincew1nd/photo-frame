@@ -102,6 +102,21 @@ void main() {
       LivePhotoMode.loop,
     );
 
+    final bounceRadio = find.byKey(
+      const ValueKey<String>('live-photo-mode-bounce'),
+    );
+    expect(
+      tester.widget<RadioListTile<LivePhotoMode>>(bounceRadio).enabled,
+      isNot(false),
+    );
+    await tester.ensureVisible(bounceRadio);
+    await tester.tap(bounceRadio);
+    await tester.pumpAndSettle();
+    expect(
+      (await repository.load()).playback.livePhotoMode,
+      LivePhotoMode.bounce,
+    );
+
     final muteSwitch = find.widgetWithText(
       SwitchListTile,
       'Mute video/live audio',

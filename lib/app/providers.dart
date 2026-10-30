@@ -51,6 +51,8 @@ final Provider<PlatformServices> platformServicesProvider =
 final Provider<MediaPlaybackFactory> mediaPlaybackFactoryProvider =
     Provider<MediaPlaybackFactory>((ref) => MediaKitPlayback.new);
 
+final Provider<bool> preloadMediaProvider = Provider<bool>((ref) => true);
+
 final Provider<StillDecoder> stillDecoderProvider = Provider<StillDecoder>(
   (ref) => NativeStillDecoder.tryCreate() ?? const PreviewOnlyStillDecoder(),
 );

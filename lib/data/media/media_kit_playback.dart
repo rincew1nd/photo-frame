@@ -16,6 +16,8 @@ class MediaKitPlayback implements MediaPlayback {
       unawaited(platform.setProperty('tone-mapping', 'bt.2446a'));
       unawaited(platform.setProperty('hdr-compute-peak', 'yes'));
       unawaited(platform.setProperty('target-peak', '100'));
+      // ponytail: lets reverse seeking land cleanly for bounce playback.
+      unawaited(platform.setProperty('hr-seek', 'yes'));
     }
     _subscriptions.addAll(<StreamSubscription<Object?>>[
       _player.stream.playing.listen((playing) {
@@ -104,6 +106,23 @@ class MediaKitPlayback implements MediaPlayback {
 
   @override
   Future<void> seek(Duration position) => _player.seek(position);
+
+  @override
+  Future<bool> setReverse(bool reverse) async {
+    final platform = _player.platform;
+    if (platform is! NativePlayer) {
+      return false;
+    }
+    try {
+      await platform.setProperty(
+        'play-direction',
+        reverse ? 'backward' : 'forward',
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   Widget video({required BoxFit fit}) {

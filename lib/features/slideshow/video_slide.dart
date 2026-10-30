@@ -15,9 +15,11 @@ class VideoSlide extends ConsumerStatefulWidget {
     required this.fit,
     required this.fallback,
     this.loop = false,
+    this.bounce = false,
     this.onCompleted,
     this.onError,
     this.fallbackSourceBuilder,
+    this.preloadedPlayback,
   });
 
   final Future<PlaybackSource?> Function() sourceBuilder;
@@ -27,8 +29,11 @@ class VideoSlide extends ConsumerStatefulWidget {
   final BoxFit fit;
   final Widget fallback;
   final bool loop;
+  /// Plays forward then backward while the slide is visible.
+  final bool bounce;
   final VoidCallback? onCompleted;
   final ValueChanged<String>? onError;
+  final MediaPlayback? preloadedPlayback;
 
   @override
   ConsumerState<VideoSlide> createState() => _VideoSlideState();
@@ -43,6 +48,9 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
   bool _errorNotified = false;
   bool _fallbackAttempted = false;
   bool _hasStarted = false;
+  bool _preloaded = false;
+  bool _reverse = false;
+  bool _bouncing = false;
 
   @override
   void initState() {
@@ -51,11 +59,21 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     // renders immediately instead of waiting on media_kit startup.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final playback = ref.read(mediaPlaybackFactoryProvider)();
+      final playback =
+          widget.preloadedPlayback ?? ref.read(mediaPlaybackFactoryProvider)();
+      _preloaded = widget.preloadedPlayback != null;
       setState(() => _playback = playback);
       _subscription = playback.snapshots.listen(_onSnapshot);
-      unawaited(_open());
+      unawaited(_preloaded ? _startPreloaded(playback) : _open());
     });
+  }
+
+  Future<void> _startPreloaded(MediaPlayback playback) async {
+    _reverse = false;
+    await playback.setMuted(widget.muted);
+    if (widget.playing) {
+      await playback.play();
+    }
   }
 
   Future<void> _open() async {
@@ -80,6 +98,7 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     _completedNotified = false;
     _errorNotified = false;
     _fallbackAttempted = false;
+    _reverse = false;
     try {
       await playback.open(
         source,
@@ -96,7 +115,8 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
       return;
     }
     if (snapshot.phase == PlaybackPhase.playing ||
-        snapshot.phase == PlaybackPhase.completed) {
+        snapshot.phase == PlaybackPhase.completed ||
+        (_preloaded && snapshot.phase == PlaybackPhase.paused)) {
       _hasStarted = true;
     }
     setState(() => _snapshot = snapshot);
@@ -105,7 +125,9 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
         return;
       }
       _completedNotified = true;
-      if (widget.loop) {
+      if (widget.bounce) {
+        unawaited(_bounce());
+      } else if (widget.loop) {
         final playback = _playback;
         if (playback != null) {
           unawaited(playback.seek(Duration.zero));
@@ -155,6 +177,48 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
       );
     } on Object {
       // The playback layer reports the failure through its snapshot stream.
+    }
+  }
+
+  /// Plays the clip backward on completion, then forward again, forever.
+  Future<void> _bounce() async {
+    if (_bouncing) {
+      return;
+    }
+    _bouncing = true;
+    try {
+      final playback = _playback;
+      if (playback == null) {
+        return;
+      }
+      final duration = _snapshot.duration;
+      if (duration == null || duration <= Duration.zero) {
+        await playback.seek(Duration.zero);
+        await playback.play();
+        return;
+      }
+      if (_reverse) {
+        _reverse = false;
+        // Either way the next pass starts from the beginning.
+        await playback.setReverse(false);
+        await playback.seek(Duration.zero);
+        await playback.play();
+        return;
+      }
+      _reverse = true;
+      final ok = await playback.setReverse(true);
+      if (!ok) {
+        // ponytail: no libmpv reverse support? loop forward instead.
+        _reverse = false;
+        await playback.seek(Duration.zero);
+        await playback.play();
+        return;
+      }
+      final target = duration - const Duration(milliseconds: 1);
+      await playback.seek(target < Duration.zero ? Duration.zero : target);
+      await playback.play();
+    } finally {
+      _bouncing = false;
     }
   }
 

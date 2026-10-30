@@ -43,6 +43,9 @@ abstract class MediaPlayback {
 
   Future<void> seek(Duration position);
 
+  /// Switches playback direction. Returns true when reverse is active.
+  Future<bool> setReverse(bool reverse) async => false;
+
   Future<void> dispose();
 
   Widget video({required BoxFit fit});
