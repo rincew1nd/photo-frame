@@ -63,7 +63,7 @@ void main() {
         fullscreen: const UnsupportedFullscreen(),
         biometrics: _NoopBiometrics(),
         singleInstance: _NoopSingleInstance(),
-        livePhotoMotion: const PlatformLivePhotoMotionSupport(),
+        livePhotoBounce: const PlatformLivePhotoBounceSupport(),
       ),
     );
     container = ProviderContainer(

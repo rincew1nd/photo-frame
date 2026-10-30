@@ -131,7 +131,7 @@ void main() {
     expect((await repository.load()).playback.muted, isFalse);
   });
 
-  testWidgets('playback screen disables live photo motion without support', (
+  testWidgets('playback screen disables only bounce without support', (
     tester,
   ) async {
     final repository = InMemorySettingsRepository(
@@ -144,7 +144,7 @@ void main() {
       repository: repository,
       screen: const PlaybackSettingsScreen(),
       overrides: [
-        livePhotoMotionSupportProvider.overrideWith(
+        livePhotoBounceSupportProvider.overrideWith(
           (ref) => Future<bool>.value(false),
         ),
       ],
@@ -163,7 +163,15 @@ void main() {
     expect(
       tester
           .widget<RadioListTile<LivePhotoMode>>(
-            find.byKey(const ValueKey<String>('live-photo-mode-off')),
+            find.byKey(const ValueKey<String>('live-photo-mode-live')),
+          )
+          .enabled,
+      isTrue,
+    );
+    expect(
+      tester
+          .widget<RadioListTile<LivePhotoMode>>(
+            find.byKey(const ValueKey<String>('live-photo-mode-loop')),
           )
           .enabled,
       isTrue,

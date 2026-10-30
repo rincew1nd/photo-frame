@@ -180,9 +180,8 @@ libraries are not built.
 - **Windows symlink error:** if plugin symlink creation fails, enable Developer Mode or keep the
   project and `PUB_CACHE` on the same volume. (The vendored secure-storage package avoids ATL, but
   Flutter still uses symlinks for plugins.)
-- **Live Photo motion:** grayed out with **Device is not supported** when the Android device lacks a
-  1440p HEVC decoder. The reference Redmi cannot decode the 1440p HEVC motion; the still remains
-  available.
+- **Live Photo Bounce:** on Android, only Bounce is grayed out with **Device is not supported**;
+  Off, Live, and Loop remain available. A saved Bounce mode falls back to Loop during playback.
 - **HEIC/AVIF/RAW:** native decode is used when the bundled libheif/LibRaw libraries are present;
   otherwise the Immich preview is shown. Windows native HEIC/AVIF/DNG decode was verified locally;
   Linux and Android require the build scripts to be run on those platforms.

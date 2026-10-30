@@ -176,8 +176,8 @@ unknown-dimension handling, and fallbacks.
 - No wide-gamut output; stills are cached as 8-bit sRGB.
 - ProRAW rendering may not match Apple’s processing exactly.
 - Software decode of high-bitrate 4K video can stutter on low-end hardware.
-- Live Photo motion requires a device HEVC decoder that supports 1920x1440 (or 1440x1920). Android
-  devices without one show **Device is not supported** and gray out the Live Photo motion modes; the
-  still remains available.
+- Live Photo Bounce is not supported on Android: only Bounce shows **Device is not supported** and is
+  grayed out, while Off, Live, and Loop remain available. A saved Bounce mode falls back to Loop
+  during playback.
 - Linux CEF overlay performance is constrained by software readback; plugins are kept small.
 - Android plugin support depends on the system WebView version.

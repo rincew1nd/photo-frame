@@ -23,8 +23,8 @@ class PlaybackSettingsScreen extends ConsumerWidget {
 
   Widget _body(WidgetRef ref, AppSettings settings) {
     final playback = settings.playback;
-    final liveSupported =
-        ref.watch(livePhotoMotionSupportProvider).value ?? true;
+    final bounceSupported =
+        ref.watch(livePhotoBounceSupportProvider).value ?? true;
     return ListView(
       children: <Widget>[
         ListTile(
@@ -97,20 +97,9 @@ class PlaybackSettingsScreen extends ConsumerWidget {
             ],
           ),
         ),
-        if (!liveSupported)
-          const ListTile(
-            leading: Icon(
-              Icons.videocam_off_outlined,
-              color: Colors.grey,
-            ),
-            title: Text('Live Photo motion'),
-            subtitle: Text('Device is not supported'),
-          ),
         const SettingsSectionHeader('Live Photo playback'),
         RadioGroup<LivePhotoMode>(
-          groupValue: liveSupported
-              ? playback.livePhotoMode
-              : LivePhotoMode.off,
+          groupValue: playback.livePhotoMode,
           onChanged: (value) {
             if (value != null) {
               _save(ref, (playback) => playback.copyWith(livePhotoMode: value));
@@ -123,8 +112,13 @@ class PlaybackSettingsScreen extends ConsumerWidget {
                   key: ValueKey<String>('live-photo-mode-${mode.name}'),
                   value: mode,
                   title: Text(settingsLabel(mode.name)),
-                  subtitle: Text(_liveSubtitle(mode)),
-                  enabled: mode == LivePhotoMode.off || liveSupported,
+                  subtitle: Text(
+                    mode == LivePhotoMode.bounce && !bounceSupported
+                        ? 'Device is not supported'
+                        : _liveSubtitle(mode),
+                  ),
+                  enabled:
+                      mode != LivePhotoMode.bounce || bounceSupported,
                 ),
             ],
           ),

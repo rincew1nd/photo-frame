@@ -1,8 +1,6 @@
 package com.rincew1nd.photoframe
 
 import android.app.Activity
-import android.media.MediaCodecInfo
-import android.media.MediaCodecList
 import android.os.Build
 import android.view.WindowManager
 import io.flutter.embedding.engine.FlutterEngine
@@ -40,27 +38,8 @@ class PlatformChannelHost(private val activity: Activity) : MethodChannel.Method
                 result.success(null)
             }
             "getAutostartSupported" -> result.success(false)
-            "supportsHevc1440p" -> result.success(supportsHevc1440p())
             else -> result.notImplemented()
         }
-    }
-
-    private fun supportsHevc1440p(): Boolean {
-        val list = MediaCodecList(MediaCodecList.REGULAR_CODECS)
-        for (info in list.codecInfos) {
-            if (info.isEncoder) continue
-            for (type in info.supportedTypes) {
-                if (!type.equals("video/hevc", true)) continue
-                try {
-                    val caps = info.getCapabilitiesForType(type).videoCapabilities ?: continue
-                    if (caps.isSizeSupported(1920, 1440) || caps.isSizeSupported(1440, 1920)) {
-                        return true
-                    }
-                } catch (_: Exception) {
-                }
-            }
-        }
-        return false
     }
 
     companion object {

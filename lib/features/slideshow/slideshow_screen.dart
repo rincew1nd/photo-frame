@@ -64,7 +64,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
   void _schedulePreload(
     SlideshowViewState state,
     AppSettings settings,
-    bool liveSupported,
+    LivePhotoMode liveMode,
   ) {
     if (!ref.read(preloadMediaProvider)) {
       return;
@@ -78,10 +78,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
       return;
     }
     final type = cached.type;
-    final wantsLive =
-        type == MediaKind.livePhoto &&
-        liveSupported &&
-        settings.playback.livePhotoMode != LivePhotoMode.off;
+    final wantsLive = type == MediaKind.livePhoto && liveMode != LivePhotoMode.off;
     final wantsVideo =
         type == MediaKind.video &&
         settings.playback.videoPlaybackMode == VideoPlaybackMode.full;
@@ -275,11 +272,13 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
     final fit = resolver.effectiveFit(current);
     final kind = cached?.type ?? current?.type ?? MediaKind.photo;
     final isVideo = kind == MediaKind.video;
-    final liveSupported =
-        ref.watch(livePhotoMotionSupportProvider).value ?? true;
-    final liveMode = liveSupported
-        ? settings.playback.livePhotoMode
-        : LivePhotoMode.off;
+    final bounceSupported =
+        ref.watch(livePhotoBounceSupportProvider).value ?? true;
+    final liveMode =
+        (!bounceSupported &&
+            settings.playback.livePhotoMode == LivePhotoMode.bounce)
+        ? LivePhotoMode.loop
+        : settings.playback.livePhotoMode;
     final showsOverlays =
         !state.nightMode || !settings.nightMode.hideOverlays;
     final motion =
@@ -300,7 +299,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
     );
     // Build the current slide first so it can claim a finished preload before
     // scheduling the one for the new next asset.
-    _schedulePreload(state, settings, liveSupported);
+    _schedulePreload(state, settings, liveMode);
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _toggleControls,

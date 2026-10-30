@@ -1061,15 +1061,24 @@ void main() {
     expect(find.byType(Image), findsWidgets);
   });
 
-  testWidgets('shows the still when live photo motion is unsupported', (
-    tester,
-  ) async {
+  testWidgets('falls back to loop when bounce is unsupported', (tester) async {
     final dir = _tempDir();
     final first = _image(dir, 'live');
     final motion = File('${dir.path}/motion.mov')
       ..writeAsBytesSync(<int>[0, 1, 2]);
-    final fake = FakeMediaPlayback();
-    addTearDown(fake.dispose);
+    final fakes = <FakeMediaPlayback>[];
+    FakeMediaPlayback factory() {
+      final fake = FakeMediaPlayback();
+      fakes.add(fake);
+      return fake;
+    }
+
+    addTearDown(() {
+      for (final fake in fakes) {
+        fake.dispose();
+      }
+    });
+
     await _pump(
       tester,
       SlideshowViewState(
@@ -1089,17 +1098,17 @@ void main() {
       settings: const AppSettings(
         overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(imageMotion: false),
-        playback: PlaybackSettings(livePhotoMode: LivePhotoMode.loop),
+        playback: PlaybackSettings(livePhotoMode: LivePhotoMode.bounce),
       ),
       overrides: [
-        livePhotoMotionSupportProvider.overrideWith(
+        livePhotoBounceSupportProvider.overrideWith(
           (ref) => Future<bool>.value(false),
         ),
-        mediaPlaybackFactoryProvider.overrideWithValue(() => fake),
+        mediaPlaybackFactoryProvider.overrideWithValue(factory),
       ],
     );
-    expect(find.text('fake-video'), findsNothing);
-    expect(find.byType(Image), findsWidgets);
+    expect(find.text('fake-video'), findsOneWidget);
+    expect(fakes.last.openedSource?.uri, motion.path);
   });
 
   testWidgets('live photo plays once then returns to the still', (tester) async {
