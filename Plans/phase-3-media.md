@@ -134,19 +134,25 @@ including HDR-to-SDR tone-mapping and graceful fallbacks.
 - [ ] HEVC 10-bit HDR and HLG video play tone-mapped to SDR.
 - [ ] AV1/VP9/ProRes files play or fall back gracefully (recorded per platform).
 - [ ] Live Photo Off/Live/Loop behaviours match the spec; audio respects mute.
-- [ ] Live Photo modes use the global setting; missing/corrupt motion falls back to the still.
-- [ ] HEIC/AVIF/DNG/ProRAW display correctly with acceptable time/memory.
-- [ ] Unknown/unsupported stills fall back to Immich previews.
-- [ ] Corrupt/truncated media never crashes the slideshow.
-- [ ] Current fit rule is preserved (fit authoritative; pan/motion only with Cover).
-- [ ] Per-aspect fit applies to videos; profiled pan rules remain correct.
-- [ ] Cache migration preserves the existing photo cache; video originals, motion, and derived bytes
-      are counted/evicted; no player/media-handle leaks.
-- [ ] `asset.download` denied means videos are unavailable/skipped.
-- [ ] Existing 182 tests remain green.
+- [x] Live Photo modes use the global setting; missing/corrupt motion falls back to the still.
+- [ ] HEIC/AVIF/DNG/ProRAW display correctly with acceptable time/memory. (HEIC/AVIF/DNG verified on
+      Windows; ProRAW/linear DNG remains unverified.)
+- [x] Unknown/unsupported stills fall back to Immich previews.
+- [x] Corrupt/truncated media never crashes the slideshow. (Video failure fallback and image fallback
+      tests; no device soak.)
+- [x] Current fit rule is preserved (fit authoritative; pan/motion only with Cover).
+- [ ] Per-aspect fit applies to videos; profiled pan rules remain correct. (Code wired; no device
+      playback test.)
+- [x] Cache migration preserves the existing photo cache; video originals, motion, and derived bytes
+      are counted/evicted. (Leak testing remains separate below.)
+- [x] `asset.download` denied means videos are unavailable/skipped.
+- [x] Existing tests remain green. (242 passed with native DLLs; 240 passed + 2 skips without.)
 - [ ] No player/media-handle leaks over repeated slide changes.
-- [ ] HDR limitation is documented and no HDR output is claimed.
-- [ ] CI green; docs updated.
+- [x] HDR limitation is documented and no HDR output is claimed.
+- [ ] CI green; docs updated. (Docs updated; CI not run.)
+
+See [`../Docs/phase-3-verification.md`](../Docs/phase-3-verification.md) for the evidence and the
+remaining platform/HDR gaps.
 
 ## Risks
 

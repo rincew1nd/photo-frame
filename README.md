@@ -22,8 +22,8 @@ Implemented:
 - Manual media selection, with a biometric lock when the platform supports it.
 - Slideshow with configurable interval, shuffle, transitions, pause/play, next/previous, and progress.
 - Original-first display for JPEG, PNG, WebP, GIF, and BMP. Native decoding for HEIC/HEIF/AVIF
-  (libheif) and DNG/ProRAW (LibRaw) with a display-sized derived JPEG cache, plus the Immich preview
-  fallback; videos use cached originals for playback.
+  (libheif) and DNG, including ProRAW where LibRaw supports the variant, with a display-sized derived
+  JPEG cache and the Immich preview fallback; videos use cached originals for playback.
 - Video playback with audio and mute (`VideoPlaybackMode.full`); `off` and `staticPreview` remain.
 - Live Photo Off/Live/Loop motion playback with a still fallback.
 - Ken Burns pan/zoom, contain/cover fitting, and adaptive backgrounds (ambient glow or blurred cover).
