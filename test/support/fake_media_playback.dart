@@ -1,0 +1,99 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:photoframe/data/media/playback.dart';
+
+/// In-memory [MediaPlayback] for widget tests.
+class FakeMediaPlayback implements MediaPlayback {
+  final StreamController<PlaybackSnapshot> _controller =
+      StreamController<PlaybackSnapshot>.broadcast();
+
+  PlaybackSource? openedSource;
+  bool? openedMuted;
+  bool? openedAutoPlay;
+  bool muted = false;
+  bool playing = false;
+  int playCalls = 0;
+  int pauseCalls = 0;
+  int seekCalls = 0;
+  bool disposed = false;
+  Duration? lastSeek;
+
+  @override
+  Stream<PlaybackSnapshot> get snapshots => _controller.stream;
+
+  @override
+  Future<void> open(
+    PlaybackSource source, {
+    required bool muted,
+    required bool autoPlay,
+  }) async {
+    openedSource = source;
+    openedMuted = muted;
+    openedAutoPlay = autoPlay;
+    this.muted = muted;
+    playing = autoPlay;
+    emit(
+      PlaybackSnapshot(
+        phase: autoPlay ? PlaybackPhase.playing : PlaybackPhase.paused,
+      ),
+    );
+  }
+
+  @override
+  Future<void> play() async {
+    playCalls++;
+    playing = true;
+    emit(const PlaybackSnapshot(phase: PlaybackPhase.playing));
+  }
+
+  @override
+  Future<void> pause() async {
+    pauseCalls++;
+    playing = false;
+    emit(const PlaybackSnapshot(phase: PlaybackPhase.paused));
+  }
+
+  @override
+  Future<void> setMuted(bool muted) async {
+    this.muted = muted;
+    emit(
+      PlaybackSnapshot(
+        phase: playing ? PlaybackPhase.playing : PlaybackPhase.paused,
+      ),
+    );
+  }
+
+  @override
+  Future<void> seek(Duration position) async {
+    seekCalls++;
+    lastSeek = position;
+    emit(
+      PlaybackSnapshot(
+        phase: playing ? PlaybackPhase.playing : PlaybackPhase.paused,
+        position: position,
+      ),
+    );
+  }
+
+  void emit(PlaybackSnapshot snapshot) {
+    if (!_controller.isClosed) {
+      _controller.add(snapshot);
+    }
+  }
+
+  @override
+  Future<void> dispose() async {
+    disposed = true;
+    // ponytail: closing in a widget test zone can leave the done future pending
+    unawaited(_controller.close());
+  }
+
+  @override
+  Widget video({required BoxFit fit}) {
+    return ColoredBox(
+      color: const Color(0xFF000000),
+      child: const Center(child: Text('fake-video')),
+    );
+  }
+}

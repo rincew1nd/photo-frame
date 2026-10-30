@@ -1,0 +1,25 @@
+{
+  "@@locale": "en",
+  "appName": "Photo Frame",
+  "@appName": {
+    "description": "Application display name."
+  },
+  "setup": "Setup",
+  "settings": "Settings",
+  "connection": "Connection",
+  "albums": "Albums",
+  "retry": "Retry",
+  "show": "Show",
+  "hide": "Hide",
+  "permissions": "Permissions",
+  "videosUnavailable": "Videos are unavailable because this API key cannot download originals.",
+  "serverUrl": "Server URL",
+  "apiKey": "API key",
+  "signIn": "Sign in with Immich",
+  "connect": "Connect",
+  "continueLabel": "Continue to albums",
+  "granted": "Granted",
+  "denied": "Denied",
+  "notTested": "Not tested",
+  "errorLabel": "Error"
+}
