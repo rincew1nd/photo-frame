@@ -87,6 +87,15 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
+# Bundle native still-image codec DLLs when built.
+set(STILLS_WIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/stills/win-x64/bin")
+if(EXISTS "${STILLS_WIN_DIR}")
+  install(DIRECTORY "${STILLS_WIN_DIR}/"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime
+    FILES_MATCHING PATTERN "*.dll")
+endif()
+
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"

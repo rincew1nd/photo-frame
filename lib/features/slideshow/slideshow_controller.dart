@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,8 @@ import 'package:photoframe/data/cache/media_downloader.dart';
 import 'package:photoframe/data/immich/immich_client.dart';
 import 'package:photoframe/data/immich/models.dart';
 import 'package:photoframe/data/media/derived_image_service.dart';
+import 'package:photoframe/data/media/derived_image_worker.dart';
+import 'package:photoframe/data/media/native/native_still_decoder.dart';
 import 'package:photoframe/data/media/preview_only_decoder.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/data/weather/weather_service.dart';
@@ -353,7 +356,8 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
     if (_derivingAssetId != null) {
       return;
     }
-    if (ref.read(stillDecoderProvider) is PreviewOnlyStillDecoder) {
+    final decoder = ref.read(stillDecoderProvider);
+    if (decoder is PreviewOnlyStillDecoder) {
       return;
     }
     if (asset.type == MediaKind.video || asset.isDecodableImage) {
@@ -373,20 +377,40 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
     _derivingAssetId = asset.id;
     try {
       final cache = await ref.read(appPathsProvider).cache();
-      // ponytail: decode runs on the caller isolate; the native decoder slice
-      // must wrap this in Isolate.run before real native decode is enabled.
-      final service = DerivedImageService(
-        decoder: ref.read(stillDecoderProvider),
-        derivedRoot: Directory(p.join(cache.path, 'derived')),
-      );
-      final result = await service.ensure(
-        source: original,
-        assetId: asset.id,
-        checksum: checksum,
-        targetLongSide: targetLongSide,
-      );
-      if (result == null) {
-        return;
+      final String derivedPath;
+      final int derivedSizeBytes;
+      if (decoder is NativeStillDecoder) {
+        // Only primitive fields cross the isolate boundary.
+        final request = DerivedImageRequest(
+          sourcePath: original.path,
+          assetId: asset.id,
+          checksum: checksum,
+          targetLongSide: targetLongSide,
+          derivedRootPath: p.join(cache.path, 'derived'),
+        );
+        final result = await Isolate.run(() => deriveImageInBackground(request));
+        if (result == null) {
+          return;
+        }
+        derivedPath = result.path;
+        derivedSizeBytes = result.sizeBytes;
+      } else {
+        // Test/fake decoder: run inline, the instance is not sendable.
+        final service = DerivedImageService(
+          decoder: decoder,
+          derivedRoot: Directory(p.join(cache.path, 'derived')),
+        );
+        final result = await service.ensure(
+          source: original,
+          assetId: asset.id,
+          checksum: checksum,
+          targetLongSide: targetLongSide,
+        );
+        if (result == null) {
+          return;
+        }
+        derivedPath = result.file.path;
+        derivedSizeBytes = result.sizeBytes;
       }
       final stored = await ref.read(cacheStoreProvider).getAsset(asset.id);
       if (stored != null) {
@@ -394,8 +418,8 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
             .read(cacheStoreProvider)
             .upsertAsset(
               stored.copyWith(
-                derivedImagePath: result.file.path,
-                derivedImageSizeBytes: result.sizeBytes,
+                derivedImagePath: derivedPath,
+                derivedImageSizeBytes: derivedSizeBytes,
               ),
             );
         await refreshCachedAsset(asset.id);

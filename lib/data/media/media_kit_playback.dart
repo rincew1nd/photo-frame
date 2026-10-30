@@ -10,6 +10,13 @@ class MediaKitPlayback implements MediaPlayback {
     MediaKit.ensureInitialized();
     _player = Player();
     _controller = VideoController(_player);
+    final platform = _player.platform;
+    if (platform is NativePlayer) {
+      // ponytail: fixed SDR target; expose a tuning knob if HDR looks flat.
+      unawaited(platform.setProperty('tone-mapping', 'bt.2446a'));
+      unawaited(platform.setProperty('hdr-compute-peak', 'yes'));
+      unawaited(platform.setProperty('target-peak', '100'));
+    }
     _subscriptions.addAll(<StreamSubscription<Object?>>[
       _player.stream.playing.listen((playing) {
         _playing = playing;

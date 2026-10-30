@@ -50,3 +50,7 @@ app.*.map.json
 # Local scratch
 .tmp/
 .playwright-mcp/
+
+# Native still-image codecs
+/third_party/stills/
+android/app/src/main/jniLibs/

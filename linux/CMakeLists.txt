@@ -106,6 +106,15 @@ foreach(bundled_library ${PLUGIN_BUNDLED_LIBRARIES})
     COMPONENT Runtime)
 endforeach(bundled_library)
 
+# Bundle native still-image codec shared libraries when built.
+set(STILLS_LINUX_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/stills/linux-x64/lib")
+if(EXISTS "${STILLS_LINUX_DIR}")
+  install(DIRECTORY "${STILLS_LINUX_DIR}/"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime
+    FILES_MATCHING PATTERN "*.so*")
+endif()
+
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/linux/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"
