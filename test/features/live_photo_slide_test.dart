@@ -115,7 +115,7 @@ void main() {
 
     expect(find.text('fake-video'), findsOneWidget);
 
-    const duration = Duration(milliseconds: 200);
+    const duration = Duration(milliseconds: 800);
     fake.emit(
       const PlaybackSnapshot(
         phase: PlaybackPhase.completed,
@@ -128,7 +128,7 @@ void main() {
     }
     await tester.pump();
 
-    expect(fake.stepBackwardCalls, greaterThan(0));
+    expect(fake.seekCalls, greaterThan(2));
     expect(fake.lastSeek, Duration.zero);
     expect(find.text('fake-video'), findsOneWidget);
     expect(find.text('still'), findsOneWidget);

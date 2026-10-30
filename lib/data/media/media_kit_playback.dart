@@ -10,7 +10,6 @@ class MediaKitPlayback implements MediaPlayback {
   MediaKitPlayback() {
     MediaKit.ensureInitialized();
     _player = Player();
-    // Android reference device fails to configure HEVC on the hardware path; use software decode.
     _controller = VideoController(
       _player,
       configuration: VideoControllerConfiguration(
@@ -113,20 +112,6 @@ class MediaKitPlayback implements MediaPlayback {
 
   @override
   Future<void> seek(Duration position) => _player.seek(position);
-
-  @override
-  Future<bool> stepBackward() async {
-    final platform = _player.platform;
-    if (platform is! NativePlayer) {
-      return false;
-    }
-    try {
-      await platform.command(<String>['frame-back-step']);
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
 
   @override
   Widget video({required BoxFit fit}) {

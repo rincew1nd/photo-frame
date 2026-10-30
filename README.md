@@ -55,8 +55,8 @@ motion for playback. At display time, formats Flutter can decode (JPEG, PNG, Web
 original with the preview as a fallback; other still formats use a display-sized derived JPEG from
 the native decoders when available, otherwise the Immich preview. Videos play from the cached
 original with audio and mute control, and Live Photos play motion (Off/Live/Loop/Bounce) with a
-still fallback. Bounce plays the motion forward, then steps backward frame by frame while the slide
-is visible; audio is not played during the reverse pass.
+still fallback. Bounce plays the motion forward, then reverses by seeking backward in short steps
+while the slide is visible (it may be choppy); audio is not played during the reverse pass.
 
 ## Requirements and toolchains
 

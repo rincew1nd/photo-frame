@@ -43,9 +43,6 @@ abstract class MediaPlayback {
 
   Future<void> seek(Duration position);
 
-  /// Steps back one frame while paused. Returns true when the step was accepted.
-  Future<bool> stepBackward() async => false;
-
   Future<void> dispose();
 
   Widget video({required BoxFit fit});

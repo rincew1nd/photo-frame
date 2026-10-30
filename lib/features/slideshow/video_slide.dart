@@ -180,7 +180,7 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     }
   }
 
-  /// Steps backward frame by frame on completion, then plays forward again.
+  /// Seeks backward in short steps on completion, then plays forward again.
   Future<void> _bounce() async {
     if (_bouncing) {
       return;
@@ -202,26 +202,19 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
       }
       _reverse = true;
       await playback.pause();
-      final target = duration - const Duration(milliseconds: 1);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      final target = duration - const Duration(milliseconds: 300);
       await playback.seek(target < Duration.zero ? Duration.zero : target);
-      var steps = 0;
-      final maxSteps = (duration.inMilliseconds / 33).ceil() + 20;
-      while (mounted && _reverse) {
+      var reversePosition = target;
+      while (mounted && _reverse && reversePosition > Duration.zero) {
         if (!widget.playing) {
           await Future<void>.delayed(const Duration(milliseconds: 50));
           continue;
         }
-        final ok = await playback.stepBackward();
-        if (!ok) {
-          // ponytail: no reverse frame stepping? restart forward from zero.
-          break;
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 33));
-        steps++;
-        if (_snapshot.position <= const Duration(milliseconds: 50) ||
-            steps > maxSteps) {
-          break;
-        }
+        reversePosition -= const Duration(milliseconds: 100);
+        if (reversePosition < Duration.zero) reversePosition = Duration.zero;
+        await playback.seek(reversePosition);
+        await Future<void>.delayed(const Duration(milliseconds: 100));
       }
       _reverse = false;
       await playback.seek(Duration.zero);
