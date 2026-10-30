@@ -7,6 +7,8 @@ import 'package:photoframe/data/cache/app_database.dart';
 import 'package:photoframe/data/cache/cache_store.dart';
 import 'package:photoframe/data/media/media_kit_playback.dart';
 import 'package:photoframe/data/media/playback.dart';
+import 'package:photoframe/data/media/preview_only_decoder.dart';
+import 'package:photoframe/data/media/still_decoder.dart';
 import 'package:photoframe/data/secure/secure_store.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/data/settings/settings_repository.dart';
@@ -47,6 +49,10 @@ final Provider<PlatformServices> platformServicesProvider =
 
 final Provider<MediaPlaybackFactory> mediaPlaybackFactoryProvider =
     Provider<MediaPlaybackFactory>((ref) => MediaKitPlayback.new);
+
+final Provider<StillDecoder> stillDecoderProvider = Provider<StillDecoder>(
+  (ref) => const PreviewOnlyStillDecoder(),
+);
 
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((ref) {
   final bootstrap = ref.watch(bootstrapProvider);

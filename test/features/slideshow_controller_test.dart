@@ -1,18 +1,34 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photoframe/app/connection_providers.dart';
 import 'package:photoframe/app/providers.dart';
 import 'package:photoframe/core/logging/app_logger.dart';
+import 'package:photoframe/data/cache/cache_assets.dart';
 import 'package:photoframe/data/cache/cache_store.dart';
 import 'package:photoframe/data/immich/immich_client.dart';
+import 'package:photoframe/data/media/still_decoder.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/data/settings/settings_repository.dart';
 import 'package:photoframe/features/slideshow/slideshow_controller.dart';
 import 'package:photoframe/platform/paths.dart';
 
 import '../support/mock_immich_server.dart';
+
+class _FakeStillDecoder implements StillDecoder {
+  @override
+  Future<DecodedRgba?> decode(String path, {required int maxLongSide}) async {
+    const width = 8;
+    const height = 4;
+    return DecodedRgba(
+      bytes: Uint8List.fromList(List<int>.filled(width * height * 4, 255)),
+      width: width,
+      height: height,
+    );
+  }
+}
 
 class _FakeConnectionController extends ConnectionController {
   _FakeConnectionController(this.client);
@@ -58,6 +74,7 @@ void main() {
         cacheStoreProvider.overrideWithValue(store),
         appPathsProvider.overrideWithValue(paths),
         appLoggerProvider.overrideWithValue(AppLogger()),
+        stillDecoderProvider.overrideWithValue(_FakeStillDecoder()),
         connectionControllerProvider.overrideWith(
           () => _FakeConnectionController(client),
         ),
@@ -94,5 +111,42 @@ void main() {
     expect(state?.cached, hasLength(3));
     expect(state?.current, isNotNull);
     expect(await store.allAssets(), hasLength(3));
+  });
+
+  test('ensureDerived stores a derived image and refreshes cached state', () async {
+    final original = File('${temporary.path}/original.heic')
+      ..writeAsBytesSync(<int>[0, 1, 2, 3]);
+    final thumbnail = File('${temporary.path}/thumb.jpg')
+      ..writeAsBytesSync(<int>[0, 1, 2, 3]);
+    final now = DateTime.utc(2026);
+    await store.upsertAsset(
+      CachedAsset(
+        id: 'heic-1',
+        originalMimeType: 'image/heic',
+        originalPath: original.path,
+        thumbnailPath: thumbnail.path,
+        checksum: 'abcdef1234567890',
+        albumIds: const <String>{'album-1'},
+        cachedAt: now,
+        lastAccessedAt: now,
+      ),
+    );
+
+    final state = await container.read(slideshowControllerProvider.future);
+    final asset = state.cached.firstWhere((entry) => entry.id == 'heic-1');
+    await container
+        .read(slideshowControllerProvider.notifier)
+        .ensureDerived(asset, targetLongSide: 320);
+
+    final stored = await store.getAsset('heic-1');
+    expect(stored?.derivedImagePath, isNotNull);
+    expect(File(stored!.derivedImagePath!).existsSync(), isTrue);
+    expect(stored.derivedImageSizeBytes, greaterThan(0));
+
+    final refreshed = container.read(slideshowControllerProvider).value;
+    final updated = refreshed!.cached.firstWhere(
+      (entry) => entry.id == 'heic-1',
+    );
+    expect(updated.derivedImagePath, stored.derivedImagePath);
   });
 }

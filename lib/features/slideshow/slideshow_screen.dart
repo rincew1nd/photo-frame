@@ -30,6 +30,7 @@ class SlideshowScreen extends ConsumerStatefulWidget {
 class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
   bool _controlsVisible = false;
   bool _weatherRequested = false;
+  String? _derivationAssetId;
 
   @override
   void initState() {
@@ -48,6 +49,31 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
 
   void _toggleControls() {
     setState(() => _controlsVisible = !_controlsVisible);
+  }
+
+  void _scheduleDerivation(CachedAsset? cached) {
+    if (cached == null ||
+        cached.type == MediaKind.video ||
+        cached.isDecodableImage ||
+        fileIfExists(cached.derivedImagePath) != null) {
+      return;
+    }
+    if (_derivationAssetId == cached.id) {
+      return;
+    }
+    _derivationAssetId = cached.id;
+    final media = MediaQuery.maybeOf(context);
+    final target = media == null
+        ? 1920
+        : (media.size.longestSide * media.devicePixelRatio).round();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      ref
+          .read(slideshowControllerProvider.notifier)
+          .ensureDerived(cached, targetLongSide: target);
+    });
   }
 
   @override
@@ -139,6 +165,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
   Widget _slideshow(SlideshowViewState state, AppSettings settings) {
     final current = state.current;
     final cached = _cachedFor(current?.id, state.cached);
+    _scheduleDerivation(cached);
     final resolver = CustomizationResolver(
       defaultProfile: settings.defaultProfile,
       customizations: settings.customizations,
@@ -611,6 +638,10 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
 File? displayFileFor(CachedAsset? asset) {
   if (asset == null) {
     return null;
+  }
+  final derived = fileIfExists(asset.derivedImagePath);
+  if (derived != null) {
+    return derived;
   }
   final original = fileIfExists(asset.originalPath);
   final thumbnail = fileIfExists(asset.thumbnailPath);

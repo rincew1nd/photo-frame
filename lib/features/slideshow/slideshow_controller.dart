@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 import 'package:photoframe/app/connection_providers.dart';
 import 'package:photoframe/app/providers.dart';
 import 'package:photoframe/core/clock.dart';
@@ -11,6 +13,8 @@ import 'package:photoframe/data/cache/cache_sync_service.dart';
 import 'package:photoframe/data/cache/media_downloader.dart';
 import 'package:photoframe/data/immich/immich_client.dart';
 import 'package:photoframe/data/immich/models.dart';
+import 'package:photoframe/data/media/derived_image_service.dart';
+import 'package:photoframe/data/media/preview_only_decoder.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/data/weather/weather_service.dart';
 import 'package:photoframe/domain/display/night_mode_service.dart';
@@ -115,6 +119,8 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
   bool _weatherFetching = false;
   bool _syncing = false;
   DateTime? _lastWeatherCheck;
+  final Set<String> _derivedAttempts = <String>{};
+  String? _derivingAssetId;
 
   @override
   Future<SlideshowViewState> build() async {
@@ -307,6 +313,9 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
   }
 
   bool _hasDisplayFile(CachedAsset asset) {
+    if (fileIfExists(asset.derivedImagePath) != null) {
+      return true;
+    }
     final thumbnail = fileIfExists(asset.thumbnailPath) != null;
     if (asset.type == MediaKind.video) {
       return thumbnail;
@@ -315,6 +324,85 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
       return fileIfExists(asset.originalPath) != null || thumbnail;
     }
     return thumbnail;
+  }
+
+  Future<void> refreshCachedAsset(String assetId) async {
+    final current = state.value;
+    if (current == null || !ref.mounted) {
+      return;
+    }
+    final asset = await ref.read(cacheStoreProvider).getAsset(assetId);
+    if (asset == null || !ref.mounted) {
+      return;
+    }
+    final latest = state.value;
+    if (latest == null) {
+      return;
+    }
+    final next = <CachedAsset>[
+      for (final entry in latest.cached)
+        if (entry.id == assetId) asset else entry,
+    ];
+    state = AsyncData(latest.copyWith(cached: next));
+  }
+
+  Future<void> ensureDerived(
+    CachedAsset asset, {
+    required int targetLongSide,
+  }) async {
+    if (_derivingAssetId != null) {
+      return;
+    }
+    if (ref.read(stillDecoderProvider) is PreviewOnlyStillDecoder) {
+      return;
+    }
+    if (asset.type == MediaKind.video || asset.isDecodableImage) {
+      return;
+    }
+    if (fileIfExists(asset.derivedImagePath) != null) {
+      return;
+    }
+    if (!_derivedAttempts.add(asset.id)) {
+      return;
+    }
+    final original = fileIfExists(asset.originalPath);
+    final checksum = asset.checksum;
+    if (original == null || checksum == null || checksum.isEmpty) {
+      return;
+    }
+    _derivingAssetId = asset.id;
+    try {
+      final cache = await ref.read(appPathsProvider).cache();
+      // ponytail: decode runs on the caller isolate; the native decoder slice
+      // must wrap this in Isolate.run before real native decode is enabled.
+      final service = DerivedImageService(
+        decoder: ref.read(stillDecoderProvider),
+        derivedRoot: Directory(p.join(cache.path, 'derived')),
+      );
+      final result = await service.ensure(
+        source: original,
+        assetId: asset.id,
+        checksum: checksum,
+        targetLongSide: targetLongSide,
+      );
+      if (result == null) {
+        return;
+      }
+      final stored = await ref.read(cacheStoreProvider).getAsset(asset.id);
+      if (stored != null) {
+        await ref
+            .read(cacheStoreProvider)
+            .upsertAsset(
+              stored.copyWith(
+                derivedImagePath: result.file.path,
+                derivedImageSizeBytes: result.sizeBytes,
+              ),
+            );
+        await refreshCachedAsset(asset.id);
+      }
+    } finally {
+      _derivingAssetId = null;
+    }
   }
 
   void _setSyncing(bool value) {

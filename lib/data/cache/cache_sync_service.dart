@@ -121,6 +121,23 @@ class CacheSyncService {
     );
   }
 
+  Future<CachedAsset?> applyDerivedImage(
+    String assetId, {
+    required String path,
+    required int sizeBytes,
+  }) async {
+    final asset = await store.getAsset(assetId);
+    if (asset == null) {
+      return null;
+    }
+    final updated = asset.copyWith(
+      derivedImagePath: path,
+      derivedImageSizeBytes: sizeBytes,
+    );
+    await store.upsertAsset(updated);
+    return updated;
+  }
+
   Future<CachedAsset?> resolve(String assetId) async {
     final asset = await store.getAsset(assetId);
     if (asset == null) {

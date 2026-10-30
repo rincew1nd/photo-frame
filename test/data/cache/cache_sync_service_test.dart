@@ -222,6 +222,40 @@ void main() {
     expect(await File(resolved.originalPath!).exists(), isTrue);
   });
 
+  test('applyDerivedImage updates the stored asset', () async {
+    await store.upsertAsset(
+      CachedAsset(
+        id: 'asset-derived',
+        albumIds: const <String>{'album-1'},
+        originalPath: '${temporary.path}/original.heic',
+        sizeBytes: 4096,
+        cachedAt: now,
+        lastAccessedAt: now,
+      ),
+    );
+
+    final updated = await service.applyDerivedImage(
+      'asset-derived',
+      path: '/cache/derived/asset-derived-v1.jpg',
+      sizeBytes: 1234,
+    );
+
+    expect(updated?.derivedImagePath, '/cache/derived/asset-derived-v1.jpg');
+    expect(updated?.derivedImageSizeBytes, 1234);
+    final stored = await store.getAsset('asset-derived');
+    expect(stored?.derivedImagePath, '/cache/derived/asset-derived-v1.jpg');
+    expect(stored?.derivedImageSizeBytes, 1234);
+
+    expect(
+      await service.applyDerivedImage(
+        'missing',
+        path: '/cache/derived/missing.jpg',
+        sizeBytes: 1,
+      ),
+      isNull,
+    );
+  });
+
   test('clear removes cached rows and media directories', () async {
     await service.syncAlbums(<String>{'album-1'});
     final cache = await paths.cache();

@@ -344,6 +344,43 @@ void main() {
     expect(displayFileFor(asset)?.path, preview.path);
   });
 
+  test('displayFileFor prefers a usable derived image', () {
+    final dir = _tempDir();
+    final original = File('${dir.path}/photo.heic')
+      ..writeAsBytesSync(<int>[0, 1, 2]);
+    final thumbnail = _image(dir, 'thumb');
+    final derived = _image(dir, 'derived');
+    final asset = CachedAsset(
+      id: 'heic-derived',
+      originalMimeType: 'image/heic',
+      originalPath: original.path,
+      thumbnailPath: thumbnail.path,
+      derivedImagePath: derived.path,
+      cachedAt: DateTime.utc(2026),
+      lastAccessedAt: DateTime.utc(2026),
+    );
+
+    expect(displayFileFor(asset)!.path, derived.path);
+  });
+
+  test('displayFileFor falls back to the thumbnail for a missing derived image', () {
+    final dir = _tempDir();
+    final original = File('${dir.path}/photo.heic')
+      ..writeAsBytesSync(<int>[0, 1, 2]);
+    final thumbnail = _image(dir, 'thumb');
+    final asset = CachedAsset(
+      id: 'heic-derived-missing',
+      originalMimeType: 'image/heic',
+      originalPath: original.path,
+      thumbnailPath: thumbnail.path,
+      derivedImagePath: '${dir.path}/missing-derived.png',
+      cachedAt: DateTime.utc(2026),
+      lastAccessedAt: DateTime.utc(2026),
+    );
+
+    expect(displayFileFor(asset)?.path, thumbnail.path);
+  });
+
   testWidgets(
     'unsupported original without a preview shows the no-cache state',
     (tester) async {

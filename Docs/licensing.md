@@ -28,8 +28,10 @@ Required repository additions:
 | webview_cef | Apache-2.0 | Include notice |
 | CEF | BSD-style | Include CEF/Chromium third-party licenses |
 | Chromium | BSD-style plus third-party licenses | Include `LICENSES.chromium.html` or equivalent |
-| libheif | LGPL-3.0 | Dynamic linking; notices/source offer |
-| LibRaw | LGPL-2.1 or CDDL-1.0 | Choose LGPL-2.1; dynamic linking |
+| libheif | LGPL-3.0 | Planned Phase 3; dynamic linking; notices/source offer |
+| libde265 | LGPL-3.0 | Planned Phase 3; dynamic linking; notices/source offer |
+| dav1d | BSD-2-Clause | Planned Phase 3; include notice |
+| LibRaw | LGPL-2.1 or CDDL-1.0 (alternative) | Planned Phase 3; choose LGPL-2.1; dynamic linking; notices/source offer |
 | flutter_secure_storage | BSD-style | Include notice |
 | webview_flutter | BSD-style | Include notice |
 | local_auth, wakelock_plus, window_manager, launch_at_startup | Permissive (BSD/MIT/Apache-2.0) | Generate notices |
@@ -40,7 +42,7 @@ authoritative list.
 
 ## 3. LGPL compliance
 
-libmpv, FFmpeg (LGPL build), libheif, and LibRaw are LGPL dependencies. To keep the MIT app
+libmpv, FFmpeg (LGPL build), libheif, libde265, and LibRaw are LGPL dependencies. To keep the MIT app
 compliant:
 
 - Link them dynamically (`.so`/`.dll`/Android shared libraries), not statically.
@@ -73,12 +75,23 @@ compliant:
 - CEF helper processes and resources must be included in the desktop package.
 - Keep CEF updated for security; review release notes for licensing changes.
 
-## 6. libheif and LibRaw
+## 6. Native still decoders (planned Phase 3)
 
-- libheif: LGPL-3.0. Dynamic linking, notices, source offer.
-- HEIC/AVIF decoding may use libde265, dav1d, or other codec libraries. Include their notices and
-  comply with their licenses.
-- LibRaw: choose LGPL-2.1 (or CDDL-1.0). Dynamic linking; include notice/source offer.
+This is the planned Phase 3 dependency set. The libraries are not bundled yet; until they are, the app
+falls back to Immich previews for HEIC/AVIF/RAW.
+
+- libheif: LGPL-3.0. HEIC/AVIF container and decode API. Dynamic linking, notices, source offer.
+- libde265: LGPL-3.0. HEVC/HEIC codec used by libheif. Dynamic linking, notices, source offer.
+- dav1d: BSD-2-Clause. AV1/AVIF codec. Include the upstream notice.
+- LibRaw: LGPL-2.1 (or CDDL-1.0 alternative). RAW (CR2/NEF/ARW/DNG/ProRAW). Choose LGPL-2.1; dynamic
+  linking; include notice/source offer.
+- Dynamic linking only: one shared library per decoder, never merged into the app binary, so the LGPL
+  libraries can be replaced and the app relinked. Provide the corresponding source for the exact library
+  versions or a valid written offer.
+- Bundle the license/notice files with the eventual native libraries (`third_party/stills/licenses/`,
+  copied to the packaged `licenses/` directory).
+- x265 and AOM encoders are intentionally excluded; no encoding capability is added. Keep them out of
+  every build script.
 - ProRAW is a DNG variant processed through LibRaw; no Adobe SDK is required for the planned path.
   Validate support and document any limitations.
 
