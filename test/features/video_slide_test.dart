@@ -166,7 +166,7 @@ void main() {
     expect(fake.playing, isTrue);
   });
 
-  testWidgets('bounce reverses on completion then resumes forward', (
+  testWidgets('bounce steps backward on completion then resumes forward', (
     tester,
   ) async {
     final fake = FakeMediaPlayback();
@@ -179,7 +179,7 @@ void main() {
       _slide(playing: true, bounce: true, onCompleted: () => completions++),
     );
 
-    const duration = Duration(seconds: 2);
+    const duration = Duration(milliseconds: 200);
     fake.emit(
       const PlaybackSnapshot(
         phase: PlaybackPhase.completed,
@@ -187,29 +187,16 @@ void main() {
       ),
     );
     await tester.pump();
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
     await tester.pump();
 
-    expect(fake.reverse, isTrue);
-    expect(fake.reverseCalls, 1);
-    expect(
-      fake.lastSeek,
-      duration - const Duration(milliseconds: 1),
-    );
-    expect(fake.playCalls, 1);
-
-    fake.emit(
-      const PlaybackSnapshot(
-        phase: PlaybackPhase.completed,
-        duration: duration,
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
-
-    expect(fake.reverse, isFalse);
-    expect(fake.reverseCalls, 2);
+    expect(fake.stepBackwardCalls, greaterThan(0));
+    expect(fake.position, Duration.zero);
     expect(fake.lastSeek, Duration.zero);
-    expect(fake.playCalls, 2);
+    expect(fake.playCalls, 1);
+    expect(fake.playing, isTrue);
     expect(completions, 0);
   });
 

@@ -43,8 +43,8 @@ abstract class MediaPlayback {
 
   Future<void> seek(Duration position);
 
-  /// Switches playback direction. Returns true when reverse is active.
-  Future<bool> setReverse(bool reverse) async => false;
+  /// Steps back one frame while paused. Returns true when the step was accepted.
+  Future<bool> stepBackward() async => false;
 
   Future<void> dispose();
 

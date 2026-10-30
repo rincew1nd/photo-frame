@@ -180,7 +180,7 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     }
   }
 
-  /// Plays the clip backward on completion, then forward again, forever.
+  /// Steps backward frame by frame on completion, then plays forward again.
   Future<void> _bounce() async {
     if (_bouncing) {
       return;
@@ -193,30 +193,41 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
       }
       final duration = _snapshot.duration;
       if (duration == null || duration <= Duration.zero) {
-        await playback.seek(Duration.zero);
-        await playback.play();
-        return;
-      }
-      if (_reverse) {
         _reverse = false;
-        // Either way the next pass starts from the beginning.
-        await playback.setReverse(false);
         await playback.seek(Duration.zero);
-        await playback.play();
+        if (widget.playing) {
+          await playback.play();
+        }
         return;
       }
       _reverse = true;
-      final ok = await playback.setReverse(true);
-      if (!ok) {
-        // ponytail: no libmpv reverse support? loop forward instead.
-        _reverse = false;
-        await playback.seek(Duration.zero);
-        await playback.play();
-        return;
-      }
+      await playback.pause();
       final target = duration - const Duration(milliseconds: 1);
       await playback.seek(target < Duration.zero ? Duration.zero : target);
-      await playback.play();
+      var steps = 0;
+      final maxSteps = (duration.inMilliseconds / 33).ceil() + 20;
+      while (mounted && _reverse) {
+        if (!widget.playing) {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          continue;
+        }
+        final ok = await playback.stepBackward();
+        if (!ok) {
+          // ponytail: no reverse frame stepping? restart forward from zero.
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 33));
+        steps++;
+        if (_snapshot.position <= const Duration(milliseconds: 50) ||
+            steps > maxSteps) {
+          break;
+        }
+      }
+      _reverse = false;
+      await playback.seek(Duration.zero);
+      if (widget.playing) {
+        await playback.play();
+      }
     } finally {
       _bouncing = false;
     }
@@ -243,6 +254,7 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     final playback = _playback;
     _subscription = null;
     _playback = null;
+    _reverse = false;
     if (subscription != null) {
       unawaited(subscription.cancel());
     }

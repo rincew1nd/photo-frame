@@ -108,16 +108,13 @@ class MediaKitPlayback implements MediaPlayback {
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
-  Future<bool> setReverse(bool reverse) async {
+  Future<bool> stepBackward() async {
     final platform = _player.platform;
     if (platform is! NativePlayer) {
       return false;
     }
     try {
-      await platform.setProperty(
-        'play-direction',
-        reverse ? 'backward' : 'forward',
-      );
+      await platform.command(<String>['frame-back-step']);
       return true;
     } catch (_) {
       return false;

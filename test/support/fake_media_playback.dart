@@ -17,8 +17,8 @@ class FakeMediaPlayback implements MediaPlayback {
   int playCalls = 0;
   int pauseCalls = 0;
   int seekCalls = 0;
-  bool reverse = false;
-  int reverseCalls = 0;
+  Duration position = Duration.zero;
+  int stepBackwardCalls = 0;
   bool disposed = false;
   bool emitOnOpen = true;
   Duration? lastSeek;
@@ -75,6 +75,7 @@ class FakeMediaPlayback implements MediaPlayback {
   Future<void> seek(Duration position) async {
     seekCalls++;
     lastSeek = position;
+    this.position = position;
     emit(
       PlaybackSnapshot(
         phase: playing ? PlaybackPhase.playing : PlaybackPhase.paused,
@@ -84,9 +85,16 @@ class FakeMediaPlayback implements MediaPlayback {
   }
 
   @override
-  Future<bool> setReverse(bool reverse) async {
-    this.reverse = reverse;
-    reverseCalls++;
+  Future<bool> stepBackward() async {
+    stepBackwardCalls++;
+    final next = position - const Duration(milliseconds: 33);
+    position = next < Duration.zero ? Duration.zero : next;
+    emit(
+      PlaybackSnapshot(
+        phase: PlaybackPhase.paused,
+        position: position,
+      ),
+    );
     return true;
   }
 
