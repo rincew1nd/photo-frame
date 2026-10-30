@@ -4,27 +4,33 @@ Scope: decode stills Flutter cannot, cache a display-sized JPEG, render it. No v
 
 ## 1. Current state (verified against the working tree)
 
-Committed in `afd5f47` (decoder seam + derived service):
-- `lib/data/media/still_decoder.dart` — `StillDecoder.decode(String path, {required int maxLongSide})`, `DecodedRgba{bytes, width, height}`.
-- `lib/data/media/preview_only_decoder.dart` — `PreviewOnlyStillDecoder`, returns `null`.
-- `lib/data/media/derived_image_service.dart` — `DerivedImageService.ensure({source, assetId, checksum, targetLongSide})`, `bucketFor` (320 step, clamp 320..3840), `cacheKeyFor` (`v1-<checksum8>-L<bucket>`), `<assetId>-<key>.jpg`, `.part` → rename.
-- Tests: `test/data/media/derived_image_service_test.dart`, `test/data/media/preview_only_decoder_test.dart`.
-- `image: ^4.12.0` is a direct dependency; `ffi` is transitive only.
+Done:
+- **Decoder seam:** `lib/data/media/still_decoder.dart` (`StillDecoder.decode`, `DecodedRgba`) and
+  `preview_only_decoder.dart` (`PreviewOnlyStillDecoder`, returns `null`).
+- **Derived cache:** `derived_image_service.dart` — `ensure`, `bucketFor` (320 step, clamp 320..3840),
+  `cacheKeyFor` (`v1-<checksum8>-L<bucket>`), `<assetId>-<key>.jpg`, `.part` → rename.
+- **Cache/slideshow wiring:** `CacheSyncService.applyDerivedImage` persists path/size;
+  `SlideshowController.refreshCachedAsset` plus a one-at-a-time `ensureDerived` queue; `displayFileFor`
+  returns derived → original → thumbnail for decodable stills and derived → thumbnail otherwise.
+- **Isolate worker:** `lib/data/media/derived_image_worker.dart` opens libraries per worker and sends
+  back only path/size; decode is eager, so the preview shows until the derived file is ready.
+- **FFI bindings:** `native/heif_bindings.dart`, `native/libraw_bindings.dart`, `native_still_decoder.dart`.
+- **Provider selection:** `stillDecoderProvider` and the worker use
+  `NativeStillDecoder.tryCreate() ?? PreviewOnlyStillDecoder()`; any library failure logs once and falls
+  back to previews.
+- **Scripts:** `scripts/fetch-stills-deps.ps1`, `fetch-stills-deps.sh`, `build-libheif-android.sh`;
+  `third_party/stills/` is gitignored and CI-cached; Windows/Linux CMake bundle `*.dll` / `*.so*`.
+- **Tests:** derived-service/worker tests, binding tests, `native_still_decoder_test.dart`, and live
+  decode tests over `test/fixtures/stills` (HEIC/AVIF, gated by library availability).
 
-Committed foundations:
-- `derived/` is seeded by `cacheSubdirectories` (`lib/platform/paths.dart:7`) for both `AppPaths` impls.
-- `CachedAsset.derivedImagePath` / `derivedImageSizeBytes` exist, persist as `derived_image_path` /
-  `derived_image_size_bytes` (`lib/data/cache/app_database.dart`), count in stats, are deleted by
-  `CacheSyncService._deleteFiles`, and `resolve()` prefers derived → original → thumbnail.
+Verified: Windows native decode of generated HEIC/AVIF fixtures and a real Pentax K-1 DNG (7376x4932)
+decoded in about 1.5 s. LibRaw initially failed with a bitmap enum bug; fixed, and it now decodes.
 
-Still missing (pending):
-- Nothing writes `DerivedImage` back to the DB; no caller invokes `ensure`; decode+resize+encode still runs
-  on the caller isolate (`// ponytail:` comment in the service).
-- `displayFileFor` (`lib/features/slideshow/slideshow_screen.dart:611`) still returns the thumbnail for
-  any MIME outside jpeg/png/webp/gif/bmp.
-- No native libs, `scripts/`, `third_party/stills/`, `jniLibs/`, or CI cache; no isolate-based native decode.
-- `derived_images` table is documented in `Docs/data-cache.md:93` but unimplemented. **Decision: keep it
-  unimplemented** — `asset.checksum` plus the key in the filename covers invalidation.
+Pending:
+- Linux and Android native builds/runtime: scripts exist but are unverified.
+- HDR/10-bit visual tuning; ProRAW quality validation.
+- DNG fixture provenance/licensing, and native measurements on reference hardware (§5 targets, not results).
+- `derived_images` table stays unimplemented by decision — the checksum and filename key cover invalidation.
 
 ## 2. Native library strategy
 
@@ -99,38 +105,32 @@ Bucket source at the call site is `MediaQuery.sizeOf(context).longestSide * devi
 
 ## 5. Test strategy
 
-Existing: `derived_image_service_test.dart` (bucket rounding, key format, fake decoder, `.part` cleanup) and
-`preview_only_decoder_test.dart`; keep the private `_FakeStillDecoder` and add `test/support/fake_still_decoder.dart` only if a third test needs it.
+Done: `derived_image_service_test.dart`, `derived_image_worker_test.dart`,
+`preview_only_decoder_test.dart`, `native/heif_bindings_test.dart`, `native/libraw_bindings_test.dart`,
+`native/native_still_decoder_test.dart`, and gated `native/native_still_decoder_live_test.dart`
+(`sample.heic`/`sample.avif`, 64x48, asserts RGBA dimensions and non-zero pixels, skips without libraries).
+Also covered: `applyDerivedImage` persistence, `displayFileFor` precedence, and `refreshCachedAsset`.
 
-Add:
-- `applyDerivedImage` upserts path and byte count, returns the updated asset, and round-trips through `DriftCacheStore`.
-- `displayFileFor` precedence table: derived wins, missing derived falls back to original, video stays on
-  thumbnail.
-- `refreshCachedAsset` replaces one entry and leaves list order intact.
-- `native_still_decoder_test.dart`, gated by `stillsNativeAvailable()` and `skip: 'native stills not built'`
-  so a fresh clone is green; assert RGBA dimensions, not pixel equality.
-- Fixtures: `test/fixtures/stills/sample.heic` (<16 KB) and `sample.dng` (<64 KB), checked in, with a test
-  asserting those size limits.
+Pending:
+- `sample.dng` fixture (<64 KB) with recorded provenance/licensing.
 - One gated measurement test: 12 MP HEIC decode+encode under 1200 ms desktop, derived JPEG ≤ 900 KB at the
-  1920 bucket, peak RSS delta ≤ 220 MB for a 24 MP RAW.
+  1920 bucket, peak RSS delta ≤ 220 MB for a 24 MP RAW. Run on reference hardware.
 
 ## 6. Ordered implementation steps
 
-1. **Slice 1 — done (`afd5f47`):** `StillDecoder` seam, `PreviewOnlyStillDecoder`, `DerivedImageService`
-   with tests. Still no native libs, no persist, no wiring.
-2. **Slice 2 — cache/slideshow wiring, no native libs:** `applyDerivedImage` in
-   `lib/data/cache/cache_sync_service.dart`; `refreshCachedAsset` + one-at-a-time derivation queue in
-   `lib/features/slideshow/slideshow_controller.dart`; `displayFileFor` in `lib/features/slideshow/slideshow_screen.dart`;
-   `Isolate.run` at the call site. §5 tests except native. HEIC behavior unchanged (preview decoder returns `null`) — pure plumbing.
-3. **Slice 3 — native build/FFI:** `scripts/fetch-stills-deps.ps1`, `scripts/fetch-stills-deps.sh`;
-   `.gitignore` entry; `actions/cache` step in `.github/workflows/ci.yml`.
-4. `lib/data/media/native/libheif_ffi.dart`, `libraw_ffi.dart`, `native_still_decoder.dart`; add
-   `ffi: ^2.2.0` to `pubspec.yaml` dependencies.
-5. Windows bundling in `windows/CMakeLists.txt`; confirm `heif.dll` lands beside `photoframe.exe`.
-6. Linux bundling in `linux/CMakeLists.txt`; confirm `ldd` resolves `libheif.so.1` via `$ORIGIN/lib`.
-7. `scripts/build-libheif-android.sh` + `jniLibs/` output; confirm the APK contains both ABIs.
-8. Native + measurement tests, fixtures, license copies, and the `Docs/licensing.md` /
-   `Docs/data-cache.md` note (drop or mark the `derived_images` row superseded).
+1. **Done (`afd5f47`):** `StillDecoder` seam, `PreviewOnlyStillDecoder`, `DerivedImageService` with tests.
+2. **Done (`2c9b615`):** `applyDerivedImage`, `refreshCachedAsset` + one-at-a-time derivation queue,
+   `displayFileFor`, isolate worker. HEIC behavior unchanged (preview decoder returns `null`).
+3. **Done (`fc7d169`):** FFI bindings, `NativeStillDecoder`, provider selection, Windows native decode
+   verified with generated HEIC/AVIF and a real Pentax K-1 DNG.
+4. **Done:** build scripts, `.gitignore` entry, CI cache, Windows DLL bundling, Linux `.so` install
+   rules, Android `jniLibs` output script.
+5. **Pending:** run `scripts/fetch-stills-deps.sh` on Linux and confirm `ldd` resolves `libheif.so.1` via
+   `$ORIGIN/lib`.
+6. **Pending:** run `scripts/build-libheif-android.sh`, confirm both ABIs land in the APK, and verify
+   decode on a device.
+7. **Pending:** native measurement tests on reference hardware; DNG fixture with provenance/licensing;
+   ProRAW quality validation; license copies and the `Docs/licensing.md` / `Docs/data-cache.md` notes.
 
 ## 7. Risks
 

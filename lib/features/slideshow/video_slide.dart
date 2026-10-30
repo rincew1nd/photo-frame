@@ -17,9 +17,11 @@ class VideoSlide extends ConsumerStatefulWidget {
     this.loop = false,
     this.onCompleted,
     this.onError,
+    this.fallbackSourceBuilder,
   });
 
   final Future<PlaybackSource?> Function() sourceBuilder;
+  final Future<PlaybackSource?> Function()? fallbackSourceBuilder;
   final bool muted;
   final bool playing;
   final BoxFit fit;
@@ -39,6 +41,7 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
   bool _sourceError = false;
   bool _completedNotified = false;
   bool _errorNotified = false;
+  bool _fallbackAttempted = false;
 
   @override
   void initState() {
@@ -70,6 +73,7 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     _sourceError = false;
     _completedNotified = false;
     _errorNotified = false;
+    _fallbackAttempted = false;
     try {
       await playback.open(
         source,
@@ -103,9 +107,44 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     } else {
       _completedNotified = false;
       if (snapshot.phase == PlaybackPhase.failed && !_errorNotified) {
+        if (!_fallbackAttempted && widget.fallbackSourceBuilder != null) {
+          _fallbackAttempted = true;
+          unawaited(_openFallback(snapshot.error ?? 'Playback failed'));
+          return;
+        }
         _errorNotified = true;
         widget.onError?.call(snapshot.error ?? 'Playback failed');
       }
+    }
+  }
+
+  Future<void> _openFallback(String error) async {
+    final playback = _playback;
+    if (playback == null) {
+      return;
+    }
+    PlaybackSource? source;
+    try {
+      source = await widget.fallbackSourceBuilder?.call();
+    } on Object {
+      source = null;
+    }
+    if (!mounted) {
+      return;
+    }
+    if (source == null) {
+      _errorNotified = true;
+      widget.onError?.call(error);
+      return;
+    }
+    try {
+      await playback.open(
+        source,
+        muted: widget.muted,
+        autoPlay: widget.playing,
+      );
+    } on Object {
+      // The playback layer reports the failure through its snapshot stream.
     }
   }
 

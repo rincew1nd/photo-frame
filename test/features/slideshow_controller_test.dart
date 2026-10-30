@@ -149,4 +149,80 @@ void main() {
     );
     expect(updated.derivedImagePath, stored.derivedImagePath);
   });
+
+  test('build skips videos when asset.download is denied', () async {
+    final now = DateTime.utc(2026);
+    final localStore = MemoryCacheStore();
+    final files = <File>[
+      File('${temporary.path}/photo.jpg')..writeAsBytesSync(<int>[0, 1, 2]),
+      File('${temporary.path}/photo_thumb.jpg')
+        ..writeAsBytesSync(<int>[0, 1, 2]),
+      File('${temporary.path}/video.mp4')..writeAsBytesSync(<int>[3, 4, 5]),
+      File('${temporary.path}/video_thumb.jpg')
+        ..writeAsBytesSync(<int>[3, 4, 5]),
+    ];
+    await localStore.upsertAsset(
+      CachedAsset(
+        id: 'photo-1',
+        originalMimeType: 'image/jpeg',
+        originalPath: files[0].path,
+        thumbnailPath: files[1].path,
+        albumIds: const <String>{'album-1'},
+        cachedAt: now,
+        lastAccessedAt: now,
+      ),
+    );
+    await localStore.upsertAsset(
+      CachedAsset(
+        id: 'video-1',
+        type: MediaKind.video,
+        originalMimeType: 'video/mp4',
+        originalPath: files[2].path,
+        thumbnailPath: files[3].path,
+        duration: 5000,
+        albumIds: const <String>{'album-1'},
+        cachedAt: now,
+        lastAccessedAt: now,
+      ),
+    );
+
+    AppSettings settingsWith(String downloadStatus) => AppSettings(
+      connection: ConnectionSettings(
+        serverUrl: server.apiUrl.toString(),
+        albumIds: const <String>{'album-1'},
+        permissions: <String, String>{'asset.download': downloadStatus},
+      ),
+      playback: const PlaybackSettings(
+        videoPlaybackMode: VideoPlaybackMode.full,
+      ),
+    );
+
+    ProviderContainer containerWith(AppSettings settings) => ProviderContainer(
+      overrides: [
+        settingsRepositoryProvider.overrideWithValue(
+          InMemorySettingsRepository(settings),
+        ),
+        cacheStoreProvider.overrideWithValue(localStore),
+      ],
+    );
+
+    final denied = containerWith(settingsWith('denied'));
+    addTearDown(denied.dispose);
+    final deniedState = await denied.read(slideshowControllerProvider.future);
+    expect(deniedState.assets.map((asset) => asset.id), <String>['photo-1']);
+    expect(
+      deniedState.assets.any((asset) => asset.type == MediaKind.video),
+      isFalse,
+    );
+
+    final granted = containerWith(settingsWith('granted'));
+    addTearDown(granted.dispose);
+    final grantedState = await granted.read(
+      slideshowControllerProvider.future,
+    );
+    expect(
+      grantedState.assets.any((asset) => asset.type == MediaKind.video),
+      isTrue,
+    );
+  });
 }

@@ -9,9 +9,11 @@ cross-platform Flutter application for **Windows x64**, **Linux x64**, and **And
 
 ## Current scope
 
-Phase 2 is implemented, and Phase 3 video and Live Photo playback is now implemented. The app can
-connect to Immich, select albums or individual media, cache photos for offline playback, and run a
-full-screen slideshow with overlays and night mode.
+Phase 2 is implemented, and Phase 3 video, Live Photo, and native still decoding are now implemented.
+The app can connect to Immich, select albums or individual media, cache media for offline playback,
+and run a full-screen slideshow with overlays and night mode. HEIC/HEIF/AVIF and DNG/ProRAW decode
+natively through bundled libheif/LibRaw when those native libraries are present; without them the app
+falls back to Immich previews.
 
 Implemented:
 
@@ -19,8 +21,9 @@ Implemented:
 - Album selection.
 - Manual media selection, with a biometric lock when the platform supports it.
 - Slideshow with configurable interval, shuffle, transitions, pause/play, next/previous, and progress.
-- Original-first display for JPEG, PNG, WebP, GIF, and BMP. HEIC, AVIF, and RAW stills use
-  preview-sized Immich images until native decoders land; videos use cached originals for playback.
+- Original-first display for JPEG, PNG, WebP, GIF, and BMP. Native decoding for HEIC/HEIF/AVIF
+  (libheif) and DNG/ProRAW (LibRaw) with a display-sized derived JPEG cache, plus the Immich preview
+  fallback; videos use cached originals for playback.
 - Video playback with audio and mute (`VideoPlaybackMode.full`); `off` and `staticPreview` remain.
 - Live Photo Off/Live/Loop motion playback with a still fallback.
 - Ken Burns pan/zoom, contain/cover fitting, and adaptive backgrounds (ambient glow or blurred cover).
@@ -31,8 +34,9 @@ Implemented:
 
 Not implemented yet:
 
-- **Phase 3 (remaining):** native HEIC/AVIF/DNG/ProRAW originals, HDR-to-SDR tone-mapping, and native
-  codec builds. Video playback and Live Photo motion are implemented.
+- **Phase 3 (remaining):** HDR-to-SDR verification and tuning, native library builds for Linux and
+  Android (scripts exist but are unverified), and broader platform runtime testing. Video playback,
+  Live Photo motion, and Windows native still decoding are implemented.
 - **Phase 4:** plugin host and HTML/CSS/JS overlays.
 - **Phase 5:** start-on-boot, kiosk mode, and in-app updates.
 
@@ -48,9 +52,10 @@ Not implemented yet:
 The slideshow flow is: **connect → albums → cache sync → slideshow → overlays**. Sync downloads a
 preview-sized image for every asset, an original for stills, and video originals plus Live Photo
 motion for playback. At display time, formats Flutter can decode (JPEG, PNG, WebP, GIF, BMP) use the
-original with the preview as a fallback; other still formats use the Immich preview. Videos play
-from the cached original with audio and mute control, and Live Photos play motion (Off/Live/Loop)
-with a still fallback.
+original with the preview as a fallback; other still formats use a display-sized derived JPEG from
+the native decoders when available, otherwise the Immich preview. Videos play from the cached
+original with audio and mute control, and Live Photos play motion (Off/Live/Loop) with a still
+fallback.
 
 ## Requirements and toolchains
 
@@ -164,7 +169,9 @@ Directories for Phase 3/4/5 work will be added when that work starts; see
 ## Tests and CI
 
 `flutter analyze` and `flutter test` must pass. `.github/workflows/ci.yml` runs analyze/test on every
-push and pull request, and builds Android, Windows, and Linux on non-pull-request runs.
+push and pull request, and builds Android, Windows, and Linux on non-pull-request runs. Tiny still
+fixtures under `test/fixtures/stills` drive gated native decode tests, which skip when the native
+libraries are not built.
 
 ## Limitations, roadmap, and troubleshooting
 
@@ -172,7 +179,9 @@ push and pull request, and builds Android, Windows, and Linux on non-pull-reques
 - **Windows symlink error:** if plugin symlink creation fails, enable Developer Mode or keep the
   project and `PUB_CACHE` on the same volume. (The vendored secure-storage package avoids ATL, but
   Flutter still uses symlinks for plugins.)
-- **HEIC/AVIF/RAW:** these still show the Immich preview until native decoders land.
+- **HEIC/AVIF/RAW:** native decode is used when the bundled libheif/LibRaw libraries are present;
+  otherwise the Immich preview is shown. Windows native HEIC/AVIF/DNG decode was verified locally;
+  Linux and Android require the build scripts to be run on those platforms.
 - **Empty slideshow:** select at least one album and run **Sync now**.
 - **Linux:** build and runtime behavior on Linux has not been fully verified.
 - **Videos:** full playback with audio is implemented; HDR-to-SDR tone-mapping is not yet verified

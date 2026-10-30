@@ -646,12 +646,21 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
       selectedAssetIds: settings.filters.selectedAssetIds,
     );
     final assets = filter.apply(cached.map(_toImmichAsset).toList());
-    if (settings.playback.videoPlaybackMode == VideoPlaybackMode.off) {
+    if (settings.playback.videoPlaybackMode == VideoPlaybackMode.off ||
+        _videoDownloadBlocked(settings)) {
       return assets
           .where((asset) => asset.type != MediaKind.video)
           .toList();
     }
     return assets;
+  }
+
+  bool _videoDownloadBlocked(AppSettings settings) {
+    final status = PermissionStatus.fromJson(
+      settings.connection.permissions[ImmichPermission.assetDownload.jsonName],
+    );
+    return status == PermissionStatus.denied ||
+        status == PermissionStatus.error;
   }
 
   bool _isNight(AppSettings settings) {

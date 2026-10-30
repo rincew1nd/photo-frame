@@ -25,6 +25,7 @@ Future<void> _pump(
 
 VideoSlide _slide({
   Future<PlaybackSource?> Function()? sourceBuilder,
+  Future<PlaybackSource?> Function()? fallbackSourceBuilder,
   bool muted = true,
   bool playing = false,
   bool loop = false,
@@ -35,6 +36,7 @@ VideoSlide _slide({
     sourceBuilder:
         sourceBuilder ??
         () async => const PlaybackSource(uri: 'file:///video.mp4'),
+    fallbackSourceBuilder: fallbackSourceBuilder,
     muted: muted,
     playing: playing,
     fit: BoxFit.cover,
@@ -117,6 +119,102 @@ void main() {
     expect(find.text('fallback'), findsOneWidget);
     expect(find.text('fake-video'), findsNothing);
     expect(errors, <String>['boom']);
+  });
+
+  testWidgets('failed playback retries with fallback source', (tester) async {
+    final fake = FakeMediaPlayback();
+    addTearDown(fake.dispose);
+    var completions = 0;
+    var fallbackCalls = 0;
+
+    await _pump(
+      tester,
+      fake,
+      _slide(
+        fallbackSourceBuilder: () async {
+          fallbackCalls++;
+          return const PlaybackSource(uri: 'file:///playback.mp4');
+        },
+        onCompleted: () => completions++,
+      ),
+    );
+
+    fake.emit(
+      const PlaybackSnapshot(phase: PlaybackPhase.failed, error: 'boom'),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(fallbackCalls, 1);
+    expect(fake.openedSources, hasLength(2));
+    expect(fake.openedSources.last.uri, 'file:///playback.mp4');
+    expect(find.text('fake-video'), findsOneWidget);
+    expect(find.text('fallback'), findsNothing);
+
+    fake.emit(const PlaybackSnapshot(phase: PlaybackPhase.completed));
+    await tester.pump();
+    expect(completions, 1);
+  });
+
+  testWidgets('fallback source returning null reports the error once', (
+    tester,
+  ) async {
+    final fake = FakeMediaPlayback();
+    addTearDown(fake.dispose);
+    final errors = <String>[];
+
+    await _pump(
+      tester,
+      fake,
+      _slide(fallbackSourceBuilder: () async => null, onError: errors.add),
+    );
+
+    fake.emit(
+      const PlaybackSnapshot(phase: PlaybackPhase.failed, error: 'boom'),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('fallback'), findsOneWidget);
+    expect(find.text('fake-video'), findsNothing);
+    expect(errors, <String>['boom']);
+  });
+
+  testWidgets('fallback playback failure reports the error once', (
+    tester,
+  ) async {
+    final fake = FakeMediaPlayback();
+    addTearDown(fake.dispose);
+    final errors = <String>[];
+
+    await _pump(
+      tester,
+      fake,
+      _slide(
+        fallbackSourceBuilder: () async =>
+            const PlaybackSource(uri: 'file:///playback.mp4'),
+        onError: errors.add,
+      ),
+    );
+
+    fake.emit(
+      const PlaybackSnapshot(phase: PlaybackPhase.failed, error: 'boom'),
+    );
+    await tester.pump();
+    await tester.pump();
+    fake.emit(
+      const PlaybackSnapshot(phase: PlaybackPhase.failed, error: 'no fallback'),
+    );
+    fake.emit(
+      const PlaybackSnapshot(phase: PlaybackPhase.failed, error: 'no fallback'),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(fake.openedSources, hasLength(2));
+    expect(find.text('fallback'), findsOneWidget);
+    expect(find.text('fake-video'), findsNothing);
+    expect(errors, <String>['no fallback']);
   });
 
   testWidgets('null source renders fallback without opening playback', (

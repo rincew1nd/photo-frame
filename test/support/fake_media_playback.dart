@@ -9,6 +9,7 @@ class FakeMediaPlayback implements MediaPlayback {
       StreamController<PlaybackSnapshot>.broadcast();
 
   PlaybackSource? openedSource;
+  final List<PlaybackSource> openedSources = <PlaybackSource>[];
   bool? openedMuted;
   bool? openedAutoPlay;
   bool muted = false;
@@ -29,6 +30,7 @@ class FakeMediaPlayback implements MediaPlayback {
     required bool autoPlay,
   }) async {
     openedSource = source;
+    openedSources.add(source);
     openedMuted = muted;
     openedAutoPlay = autoPlay;
     this.muted = muted;

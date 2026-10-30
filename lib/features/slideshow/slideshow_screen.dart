@@ -314,6 +314,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
       return VideoSlide(
         key: ValueKey<String>('video-${cached.id}'),
         sourceBuilder: () => _playbackSourceFor(cached),
+        fallbackSourceBuilder: () => _videoFallbackSourceFor(cached),
         muted: settings.playback.muted,
         playing: playing,
         fit: boxFit,
@@ -402,6 +403,21 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
       return PlaybackSource(
         uri:
             '${client.baseUri}/assets/${Uri.encodeComponent(asset.id)}/original',
+        headers: client.authHeaders(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<PlaybackSource?> _videoFallbackSourceFor(CachedAsset asset) async {
+    try {
+      final client = await ref
+          .read(connectionControllerProvider.notifier)
+          .clientFromStoredCredentials();
+      return PlaybackSource(
+        uri:
+            '${client.baseUri}/assets/${Uri.encodeComponent(asset.id)}/video/playback',
         headers: client.authHeaders(),
       );
     } catch (_) {

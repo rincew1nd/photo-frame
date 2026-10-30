@@ -174,3 +174,7 @@ including HDR-to-SDR tone-mapping and graceful fallbacks.
 | 2026-10-29 | Playback layer | media_kit 1.2.6/media_kit_video 2.0.1, MediaPlayback/MediaKitPlayback, main initialization; 193 tests passing. |
 | 2026-10-29 | Video slideshow | Full video mode, per-slide duration/auto-advance, mute control, settings enablement; 204 tests passing. |
 | 2026-10-30 | Live Photo playback | Off/Live/Loop motion, still fallback, settings enabled; 211 tests passing. |
+| 2026-10-30 | Still pipeline | Decoder seam, derived JPEG cache, display precedence, one-at-a-time derivation, isolate decode; 225 tests passing. |
+| 2026-10-30 | Native stills | libheif/LibRaw FFI, provider selection, Windows native HEIC/AVIF verified, LibRaw verified with a real Pentax DNG; 236 tests (2 native skips without DLLs). |
+| 2026-10-30 | Native builds | Windows build script verified locally; Linux/Android scripts added but unverified; CMake bundling and CI cache wired. |
+| 2026-10-30 | HDR config | media_kit SDR tone-mapping defaults added; visual HDR verification still pending. |
