@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:photoframe/app/bootstrap.dart';
@@ -51,7 +53,10 @@ final Provider<PlatformServices> platformServicesProvider =
 final Provider<MediaPlaybackFactory> mediaPlaybackFactoryProvider =
     Provider<MediaPlaybackFactory>((ref) => MediaKitPlayback.new);
 
-final Provider<bool> preloadMediaProvider = Provider<bool>((ref) => true);
+// Android hardware decoders are scarce; avoid a second player.
+final Provider<bool> preloadMediaProvider = Provider<bool>(
+  (ref) => !Platform.isAndroid,
+);
 
 final Provider<StillDecoder> stillDecoderProvider = Provider<StillDecoder>(
   (ref) => NativeStillDecoder.tryCreate() ?? const PreviewOnlyStillDecoder(),

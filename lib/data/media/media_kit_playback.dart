@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:media_kit/media_kit.dart';
@@ -9,7 +10,13 @@ class MediaKitPlayback implements MediaPlayback {
   MediaKitPlayback() {
     MediaKit.ensureInitialized();
     _player = Player();
-    _controller = VideoController(_player);
+    // Android reference device fails to configure HEVC on the hardware path; use software decode.
+    _controller = VideoController(
+      _player,
+      configuration: VideoControllerConfiguration(
+        enableHardwareAcceleration: !Platform.isAndroid,
+      ),
+    );
     final platform = _player.platform;
     if (platform is NativePlayer) {
       // ponytail: fixed SDR target; expose a tuning knob if HDR looks flat.
