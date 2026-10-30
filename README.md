@@ -9,8 +9,9 @@ cross-platform Flutter application for **Windows x64**, **Linux x64**, and **And
 
 ## Current scope
 
-Phase 2 is implemented. The app can connect to Immich, select albums or individual media, cache
-photos for offline playback, and run a full-screen slideshow with overlays and night mode.
+Phase 2 is implemented, and Phase 3 video and Live Photo playback is now implemented. The app can
+connect to Immich, select albums or individual media, cache photos for offline playback, and run a
+full-screen slideshow with overlays and night mode.
 
 Implemented:
 
@@ -18,8 +19,10 @@ Implemented:
 - Album selection.
 - Manual media selection, with a biometric lock when the platform supports it.
 - Slideshow with configurable interval, shuffle, transitions, pause/play, next/previous, and progress.
-- Original-first display for JPEG, PNG, WebP, GIF, and BMP; Immich preview-sized images are used for
-  HEIC, AVIF, RAW, and video assets.
+- Original-first display for JPEG, PNG, WebP, GIF, and BMP. HEIC, AVIF, and RAW stills use
+  preview-sized Immich images until native decoders land; videos use cached originals for playback.
+- Video playback with audio and mute (`VideoPlaybackMode.full`); `off` and `staticPreview` remain.
+- Live Photo Off/Live/Loop motion playback with a still fallback.
 - Ken Burns pan/zoom, contain/cover fitting, and adaptive backgrounds (ambient glow or blurred cover).
 - Disk cache with checksum verification, resume, LRU eviction, quota, and offline playback.
 - Clock, weather, and EXIF overlays; night mode; settings screens.
@@ -28,8 +31,8 @@ Implemented:
 
 Not implemented yet:
 
-- **Phase 3:** video/audio playback (videos currently show a static preview), Live Photo motion,
-  native HEIC/AVIF/RAW originals, and true HDR.
+- **Phase 3 (remaining):** native HEIC/AVIF/DNG/ProRAW originals, HDR-to-SDR tone-mapping, and native
+  codec builds. Video playback and Live Photo motion are implemented.
 - **Phase 4:** plugin host and HTML/CSS/JS overlays.
 - **Phase 5:** start-on-boot, kiosk mode, and in-app updates.
 
@@ -43,9 +46,11 @@ Not implemented yet:
 - Settings: a JSON file in the application support directory.
 
 The slideshow flow is: **connect → albums → cache sync → slideshow → overlays**. Sync downloads a
-preview-sized image for every asset and an original for stills. At display time, formats Flutter can
-decode (JPEG, PNG, WebP, GIF, BMP) use the original with the preview as a fallback; other still
-formats and videos use the Immich preview. Video thumbnails remain static previews until Phase 3.
+preview-sized image for every asset, an original for stills, and video originals plus Live Photo
+motion for playback. At display time, formats Flutter can decode (JPEG, PNG, WebP, GIF, BMP) use the
+original with the preview as a fallback; other still formats use the Immich preview. Videos play
+from the cached original with audio and mute control, and Live Photos play motion (Off/Live/Loop)
+with a still fallback.
 
 ## Requirements and toolchains
 
@@ -167,10 +172,11 @@ push and pull request, and builds Android, Windows, and Linux on non-pull-reques
 - **Windows symlink error:** if plugin symlink creation fails, enable Developer Mode or keep the
   project and `PUB_CACHE` on the same volume. (The vendored secure-storage package avoids ATL, but
   Flutter still uses symlinks for plugins.)
-- **HEIC/AVIF/RAW:** these show the Immich preview until native decoders arrive in Phase 3.
+- **HEIC/AVIF/RAW:** these still show the Immich preview until native decoders land.
 - **Empty slideshow:** select at least one album and run **Sync now**.
 - **Linux:** build and runtime behavior on Linux has not been fully verified.
-- **Videos:** static preview only until Phase 3.
+- **Videos:** full playback with audio is implemented; HDR-to-SDR tone-mapping is not yet verified
+  and native codec builds remain pending.
 - **Plugins, kiosk/boot, updates, true HDR:** scheduled for Phase 4 and Phase 5.
 
 ## Documentation

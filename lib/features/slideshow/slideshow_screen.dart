@@ -14,6 +14,7 @@ import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/data/weather/weather_service.dart';
 import 'package:photoframe/domain/media/ken_burns.dart';
 import 'package:photoframe/domain/media/media_filters.dart';
+import 'package:photoframe/features/slideshow/live_photo_slide.dart';
 import 'package:photoframe/features/slideshow/slideshow_controller.dart';
 import 'package:photoframe/features/slideshow/video_slide.dart';
 import 'package:photoframe/platform/paths.dart';
@@ -184,14 +185,6 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
           if (isVideo &&
               settings.playback.videoPlaybackMode != VideoPlaybackMode.full)
             const Positioned.fill(child: IgnorePointer(child: _VideoLabel())),
-          if (kind == MediaKind.livePhoto &&
-              settings.playback.livePhotoMode != LivePhotoMode.off)
-            const Positioned(
-              left: 0,
-              right: 0,
-              bottom: 64,
-              child: IgnorePointer(child: _LivePhotoHint()),
-            ),
           if (showsOverlays)
             Positioned.fill(
               child: SafeArea(
@@ -303,6 +296,18 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
             .advanceIfCurrent(cached.id),
       );
     }
+    if (cached.type == MediaKind.livePhoto &&
+        settings.playback.livePhotoMode != LivePhotoMode.off) {
+      return LivePhotoSlide(
+        key: ValueKey<String>('live-${cached.id}'),
+        mode: settings.playback.livePhotoMode,
+        sourceBuilder: () => _livePlaybackSourceFor(cached),
+        muted: settings.playback.muted,
+        playing: playing,
+        fit: boxFit,
+        still: _SlideImage(file: display, thumbnail: thumbnail, fit: boxFit),
+      );
+    }
     final imageAspect = _imageAspect(cached, current);
     final foreground = _KenBurns(
       key: ValueKey<String>(
@@ -370,6 +375,29 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
       return PlaybackSource(
         uri:
             '${client.baseUri}/assets/${Uri.encodeComponent(asset.id)}/original',
+        headers: client.authHeaders(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<PlaybackSource?> _livePlaybackSourceFor(CachedAsset asset) async {
+    try {
+      final local = fileIfExists(asset.liveVideoPath);
+      if (local != null) {
+        return PlaybackSource(uri: local.path);
+      }
+      final videoId = asset.livePhotoVideoId;
+      if (videoId == null || videoId.isEmpty) {
+        return null;
+      }
+      final client = await ref
+          .read(connectionControllerProvider.notifier)
+          .clientFromStoredCredentials();
+      return PlaybackSource(
+        uri:
+            '${client.baseUri}/assets/${Uri.encodeComponent(videoId)}/original',
         headers: client.authHeaders(),
       );
     } catch (_) {
@@ -677,27 +705,6 @@ class _VideoLabel extends StatelessWidget {
               style: TextStyle(color: Colors.white, fontSize: 12),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LivePhotoHint extends StatelessWidget {
-  const _LivePhotoHint();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.black54,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Text(
-          'Live Photo motion in Phase 3',
-          style: TextStyle(color: Colors.white70, fontSize: 12),
         ),
       ),
     );

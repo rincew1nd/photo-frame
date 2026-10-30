@@ -1,6 +1,6 @@
 # Phase 3 — Video, Audio, Live Photos, and Original Stills
 
-Status: Not started (plan revised 2026-10-29)
+Status: In progress
 Depends on: Phase 2 (done) plus the post-Phase-2 cleanup
 Unblocks: Phase 4
 
@@ -169,5 +169,8 @@ including HDR-to-SDR tone-mapping and graceful fallbacks.
 
 | Date | Result | Notes |
 |---|---|---|
-| - | - | - |
 | 2026-10-29 | Plan revised | Aligned with delivered Phase 2 and cleanup: settings schema v2, photo-only cache, preview placeholders, removed offline resolver/Result, 182 tests. |
+| 2026-10-29 | Cache plumbing | Video originals, Live Photo motion, derived/motion paths, DB v3 migration, eviction/stats; 189 tests passing. |
+| 2026-10-29 | Playback layer | media_kit 1.2.6/media_kit_video 2.0.1, MediaPlayback/MediaKitPlayback, main initialization; 193 tests passing. |
+| 2026-10-29 | Video slideshow | Full video mode, per-slide duration/auto-advance, mute control, settings enablement; 204 tests passing. |
+| 2026-10-30 | Live Photo playback | Off/Live/Loop motion, still fallback, settings enabled; 211 tests passing. |

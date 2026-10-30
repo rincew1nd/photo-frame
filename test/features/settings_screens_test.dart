@@ -85,13 +85,21 @@ void main() {
       VideoPlaybackMode.full,
     );
 
+    final loopRadio = find.byKey(
+      const ValueKey<String>('live-photo-mode-loop'),
+    );
+    // ponytail: production leaves `enabled` null (resolved by RadioGroup),
+    // so assert "not disabled" rather than requiring an explicit true.
     expect(
-      tester
-          .widget<RadioListTile<LivePhotoMode>>(
-            find.byKey(const ValueKey<String>('live-photo-mode-loop')),
-          )
-          .enabled,
-      isFalse,
+      tester.widget<RadioListTile<LivePhotoMode>>(loopRadio).enabled,
+      isNot(false),
+    );
+    await tester.ensureVisible(loopRadio);
+    await tester.tap(loopRadio);
+    await tester.pumpAndSettle();
+    expect(
+      (await repository.load()).playback.livePhotoMode,
+      LivePhotoMode.loop,
     );
 
     final muteSwitch = find.widgetWithText(

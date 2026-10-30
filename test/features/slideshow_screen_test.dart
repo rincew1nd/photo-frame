@@ -840,9 +840,12 @@ void main() {
     expect(tester.getSize(find.byType(Image)), const Size(400, 800));
   });
 
-  testWidgets('shows the live photo hint for loop mode', (tester) async {
+  testWidgets('plays live photo motion for loop mode', (tester) async {
     final dir = _tempDir();
     final first = _image(dir, 'live');
+    final motion = File('${dir.path}/motion.mov')
+      ..writeAsBytesSync(<int>[0, 1, 2]);
+    final fake = FakeMediaPlayback();
     await _pump(
       tester,
       SlideshowViewState(
@@ -852,7 +855,10 @@ void main() {
         current: const ImmichAsset(id: 'lp1', type: MediaKind.livePhoto),
         loading: false,
         cached: <CachedAsset>[
-          _cached('lp1', first).copyWith(type: MediaKind.livePhoto),
+          _cached(
+            'lp1',
+            first,
+          ).copyWith(type: MediaKind.livePhoto, liveVideoPath: motion.path),
         ],
       ),
       settings: const AppSettings(
@@ -860,14 +866,19 @@ void main() {
         defaultProfile: AspectProfile(imageMotion: false),
         playback: PlaybackSettings(livePhotoMode: LivePhotoMode.loop),
       ),
+      overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
     );
-    expect(find.text('Live Photo motion in Phase 3'), findsOneWidget);
-    expect(find.text('Video preview'), findsNothing);
+    expect(find.text('fake-video'), findsOneWidget);
+    expect(find.text('Live Photo motion in Phase 3'), findsNothing);
+    expect(fake.openedSource?.uri, motion.path);
   });
 
-  testWidgets('hides the live photo hint when the mode is off', (tester) async {
+  testWidgets('shows the still when the live photo mode is off', (tester) async {
     final dir = _tempDir();
     final first = _image(dir, 'live');
+    final motion = File('${dir.path}/motion.mov')
+      ..writeAsBytesSync(<int>[0, 1, 2]);
+    final fake = FakeMediaPlayback();
     await _pump(
       tester,
       SlideshowViewState(
@@ -877,7 +888,10 @@ void main() {
         current: const ImmichAsset(id: 'lp1', type: MediaKind.livePhoto),
         loading: false,
         cached: <CachedAsset>[
-          _cached('lp1', first).copyWith(type: MediaKind.livePhoto),
+          _cached(
+            'lp1',
+            first,
+          ).copyWith(type: MediaKind.livePhoto, liveVideoPath: motion.path),
         ],
       ),
       settings: const AppSettings(
@@ -885,9 +899,50 @@ void main() {
         defaultProfile: AspectProfile(imageMotion: false),
         playback: PlaybackSettings(livePhotoMode: LivePhotoMode.off),
       ),
+      overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
     );
+    expect(find.text('fake-video'), findsNothing);
     expect(find.text('Live Photo motion in Phase 3'), findsNothing);
-    expect(find.text('Video preview'), findsNothing);
+    expect(find.byType(Image), findsWidgets);
+  });
+
+  testWidgets('live photo plays once then returns to the still', (tester) async {
+    final dir = _tempDir();
+    final first = _image(dir, 'live');
+    final motion = File('${dir.path}/motion.mov')
+      ..writeAsBytesSync(<int>[0, 1, 2]);
+    final fake = FakeMediaPlayback();
+    await _pump(
+      tester,
+      SlideshowViewState(
+        assets: const <ImmichAsset>[
+          ImmichAsset(id: 'lp1', type: MediaKind.livePhoto),
+        ],
+        current: const ImmichAsset(id: 'lp1', type: MediaKind.livePhoto),
+        loading: false,
+        cached: <CachedAsset>[
+          _cached(
+            'lp1',
+            first,
+          ).copyWith(type: MediaKind.livePhoto, liveVideoPath: motion.path),
+        ],
+      ),
+      settings: const AppSettings(
+        overlays: OverlaySettings(clock: false),
+        defaultProfile: AspectProfile(imageMotion: false),
+        playback: PlaybackSettings(livePhotoMode: LivePhotoMode.live),
+      ),
+      overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
+    );
+    expect(find.text('fake-video'), findsOneWidget);
+
+    fake.emit(const PlaybackSnapshot(phase: PlaybackPhase.completed));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('fake-video'), findsNothing);
+    expect(find.byType(Image), findsWidgets);
+    expect(find.text('Live Photo motion in Phase 3'), findsNothing);
   });
 
   testWidgets('requests weather on first frame when enabled', (tester) async {

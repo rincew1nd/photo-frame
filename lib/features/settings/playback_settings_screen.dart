@@ -111,7 +111,6 @@ class PlaybackSettingsScreen extends ConsumerWidget {
                   value: mode,
                   title: Text(settingsLabel(mode.name)),
                   subtitle: Text(_liveSubtitle(mode)),
-                  enabled: mode == LivePhotoMode.off,
                 ),
             ],
           ),
@@ -154,8 +153,10 @@ class PlaybackSettingsScreen extends ConsumerWidget {
   }
 
   String _liveSubtitle(LivePhotoMode mode) {
-    return mode == LivePhotoMode.off
-        ? 'Show as a still photo.'
-        : 'Not available yet.';
+    return switch (mode) {
+      LivePhotoMode.off => 'Show as a still photo.',
+      LivePhotoMode.live => 'Play the motion once, then show the still.',
+      LivePhotoMode.loop => 'Repeat the motion while the slide is visible.',
+    };
   }
 }
