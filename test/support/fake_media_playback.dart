@@ -18,6 +18,7 @@ class FakeMediaPlayback implements MediaPlayback {
   int pauseCalls = 0;
   int seekCalls = 0;
   bool disposed = false;
+  bool emitOnOpen = true;
   Duration? lastSeek;
 
   @override
@@ -35,11 +36,13 @@ class FakeMediaPlayback implements MediaPlayback {
     openedAutoPlay = autoPlay;
     this.muted = muted;
     playing = autoPlay;
-    emit(
-      PlaybackSnapshot(
-        phase: autoPlay ? PlaybackPhase.playing : PlaybackPhase.paused,
-      ),
-    );
+    if (emitOnOpen) {
+      emit(
+        PlaybackSnapshot(
+          phase: autoPlay ? PlaybackPhase.playing : PlaybackPhase.paused,
+        ),
+      );
+    }
   }
 
   @override

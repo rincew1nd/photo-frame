@@ -113,6 +113,39 @@ void main() {
     expect(await store.allAssets(), hasLength(3));
   });
 
+  test('build auto-syncs when a live photo is missing its motion', () async {
+    final now = DateTime.utc(2026);
+    final still = File('${temporary.path}/live.jpg')
+      ..writeAsBytesSync(<int>[0, 1, 2]);
+    final thumbnail = File('${temporary.path}/live_thumb.jpg')
+      ..writeAsBytesSync(<int>[0, 1, 2]);
+    await store.upsertAsset(
+      CachedAsset(
+        id: 'live-1',
+        type: MediaKind.livePhoto,
+        originalMimeType: 'image/jpeg',
+        originalPath: still.path,
+        thumbnailPath: thumbnail.path,
+        livePhotoVideoId: 'live-video-1',
+        albumIds: const <String>{'album-1'},
+        cachedAt: now,
+        lastAccessedAt: now,
+      ),
+    );
+
+    final initial = await container.read(slideshowControllerProvider.future);
+    expect(initial.syncing, isTrue);
+    expect(initial.cached.single.id, 'live-1');
+
+    final deadline = DateTime.now().add(const Duration(seconds: 5));
+    while (DateTime.now().isBefore(deadline)) {
+      if (container.read(slideshowControllerProvider).value?.syncing == false) {
+        break;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+  });
+
   test('ensureDerived stores a derived image and refreshes cached state', () async {
     final original = File('${temporary.path}/original.heic')
       ..writeAsBytesSync(<int>[0, 1, 2, 3]);

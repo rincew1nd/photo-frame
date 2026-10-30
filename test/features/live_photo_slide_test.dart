@@ -61,7 +61,7 @@ void main() {
     expect(fake.openedSource, isNull);
   });
 
-  testWidgets('live plays motion once then falls back to the still', (
+  testWidgets('live plays motion once over the still then returns to it', (
     tester,
   ) async {
     final fake = FakeMediaPlayback();
@@ -73,7 +73,8 @@ void main() {
     expect(fake.openedMuted, isTrue);
     expect(fake.openedAutoPlay, isTrue);
     expect(find.text('fake-video'), findsOneWidget);
-    expect(find.text('still'), findsNothing);
+    // ponytail: the still sits behind the video to avoid a blank first frame
+    expect(find.text('still'), findsOneWidget);
 
     fake.emit(const PlaybackSnapshot(phase: PlaybackPhase.completed));
     await tester.pump();
@@ -83,7 +84,7 @@ void main() {
     expect(find.text('fake-video'), findsNothing);
   });
 
-  testWidgets('loop restarts motion on completion and keeps the still hidden', (
+  testWidgets('loop restarts motion on completion over the still', (
     tester,
   ) async {
     final fake = FakeMediaPlayback();
@@ -101,7 +102,7 @@ void main() {
     expect(fake.lastSeek, Duration.zero);
     expect(fake.playCalls, 1);
     expect(find.text('fake-video'), findsOneWidget);
-    expect(find.text('still'), findsNothing);
+    expect(find.text('still'), findsOneWidget);
   });
 
   testWidgets('null source renders the still without opening', (tester) async {

@@ -324,19 +324,30 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
             .advanceIfCurrent(cached.id),
       );
     }
+    final imageAspect = _imageAspect(cached, current);
     if (cached.type == MediaKind.livePhoto &&
         settings.playback.livePhotoMode != LivePhotoMode.off) {
-      return LivePhotoSlide(
-        key: ValueKey<String>('live-${cached.id}'),
-        mode: settings.playback.livePhotoMode,
-        sourceBuilder: () => _livePlaybackSourceFor(cached),
-        muted: settings.playback.muted,
-        playing: playing,
-        fit: boxFit,
-        still: _SlideImage(file: display, thumbnail: thumbnail, fit: boxFit),
+      return _KenBurns(
+        key: ValueKey<String>(
+          'ken-burns-live-${cached.id}-${profile.panStrength}-$imageAspect',
+        ),
+        enabled: motion,
+        pan: profile.panStrength,
+        imageAspect: imageAspect,
+        imageFile: display,
+        intervalSeconds: intervalSeconds,
+        progress: progress,
+        child: LivePhotoSlide(
+          key: ValueKey<String>('live-${cached.id}'),
+          mode: settings.playback.livePhotoMode,
+          sourceBuilder: () => _livePlaybackSourceFor(cached),
+          muted: settings.playback.muted,
+          playing: playing,
+          fit: boxFit,
+          still: _SlideImage(file: display, thumbnail: thumbnail, fit: boxFit),
+        ),
       );
     }
-    final imageAspect = _imageAspect(cached, current);
     final foreground = _KenBurns(
       key: ValueKey<String>(
         'ken-burns-${current?.id ?? cached.id}-${profile.panStrength}-$imageAspect',

@@ -233,6 +233,7 @@ SlideshowViewState _fullVideoState({
   return SlideshowViewState(
     assets: const <ImmichAsset>[ImmichAsset(id: 'v1', type: MediaKind.video)],
     current: const ImmichAsset(id: 'v1', type: MediaKind.video),
+    playing: true,
     loading: false,
     cached: <CachedAsset>[
       CachedAsset(
@@ -890,6 +891,7 @@ void main() {
           ImmichAsset(id: 'lp1', type: MediaKind.livePhoto),
         ],
         current: const ImmichAsset(id: 'lp1', type: MediaKind.livePhoto),
+        playing: true,
         loading: false,
         cached: <CachedAsset>[
           _cached(
@@ -908,6 +910,54 @@ void main() {
     expect(find.text('fake-video'), findsOneWidget);
     expect(find.text('Live Photo motion in Phase 3'), findsNothing);
     expect(fake.openedSource?.uri, motion.path);
+  });
+
+  testWidgets('live photo loop pans the still in cover mode', (tester) async {
+    final dir = _tempDir();
+    final still = (await tester.runAsync(
+      () => _sizedImage(dir, 'live-pan', 1600, 900),
+    ))!;
+    final motion = File('${dir.path}/motion.mov')
+      ..writeAsBytesSync(<int>[0, 1, 2]);
+    final fake = FakeMediaPlayback();
+    addTearDown(fake.dispose);
+    await _pump(
+      tester,
+      SlideshowViewState(
+        assets: const <ImmichAsset>[
+          ImmichAsset(id: 'lp2', type: MediaKind.livePhoto),
+        ],
+        current: const ImmichAsset(id: 'lp2', type: MediaKind.livePhoto),
+        playing: true,
+        loading: false,
+        cached: <CachedAsset>[
+          _cached('lp2', still).copyWith(
+            type: MediaKind.livePhoto,
+            liveVideoPath: motion.path,
+            width: 1600,
+            height: 900,
+          ),
+        ],
+      ),
+      settings: const AppSettings(
+        overlays: OverlaySettings(clock: false),
+        defaultProfile: AspectProfile(
+          fit: ImageFit.cover,
+          imageMotion: true,
+          panStrength: 80,
+        ),
+        playback: PlaybackSettings(
+          livePhotoMode: LivePhotoMode.loop,
+          intervalSeconds: 2,
+        ),
+      ),
+      overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
+    );
+    expect(find.text('fake-video'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('ken-burns-frame')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('shows the still when the live photo mode is off', (tester) async {
@@ -956,6 +1006,7 @@ void main() {
           ImmichAsset(id: 'lp1', type: MediaKind.livePhoto),
         ],
         current: const ImmichAsset(id: 'lp1', type: MediaKind.livePhoto),
+        playing: true,
         loading: false,
         cached: <CachedAsset>[
           _cached(

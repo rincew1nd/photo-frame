@@ -48,6 +48,52 @@ VideoSlide _slide({
 }
 
 void main() {
+  testWidgets('fallback renders on the first frame before playback is created', (
+    tester,
+  ) async {
+    final fake = FakeMediaPlayback()..emitOnOpen = false;
+    addTearDown(fake.dispose);
+    var created = 0;
+    var createdAtFirstFallbackBuild = -1;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          mediaPlaybackFactoryProvider.overrideWithValue(() {
+            created++;
+            return fake;
+          }),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: VideoSlide(
+              sourceBuilder: () async =>
+                  const PlaybackSource(uri: 'file:///video.mp4'),
+              muted: true,
+              playing: false,
+              fit: BoxFit.cover,
+              fallback: Builder(
+                builder: (_) {
+                  if (createdAtFirstFallbackBuild == -1) {
+                    createdAtFirstFallbackBuild = created;
+                  }
+                  return const Text('fallback');
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // The still is built on the first frame, before the post-frame callback
+    // creates the playback.
+    expect(createdAtFirstFallbackBuild, 0);
+    expect(created, 1);
+    expect(find.text('fallback'), findsOneWidget);
+    expect(find.text('fake-video'), findsNothing);
+  });
+
   testWidgets('opens the source and renders the video surface', (
     tester,
   ) async {
@@ -60,6 +106,23 @@ void main() {
     expect(fake.openedMuted, isFalse);
     expect(fake.openedAutoPlay, isTrue);
     expect(fake.muted, isFalse);
+    expect(find.text('fake-video'), findsOneWidget);
+  });
+
+  testWidgets('fallback stays visible until playback starts', (tester) async {
+    final fake = FakeMediaPlayback()..emitOnOpen = false;
+    addTearDown(fake.dispose);
+
+    await _pump(tester, fake, _slide());
+
+    expect(find.text('fallback'), findsOneWidget);
+    expect(find.text('fake-video'), findsNothing);
+
+    fake.emit(const PlaybackSnapshot(phase: PlaybackPhase.playing));
+    // Stream delivery is async; give the snapshot a frame to arrive.
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('fallback'), findsOneWidget);
     expect(find.text('fake-video'), findsOneWidget);
   });
 
@@ -131,6 +194,7 @@ void main() {
       tester,
       fake,
       _slide(
+        playing: true,
         fallbackSourceBuilder: () async {
           fallbackCalls++;
           return const PlaybackSource(uri: 'file:///playback.mp4');
@@ -149,7 +213,6 @@ void main() {
     expect(fake.openedSources, hasLength(2));
     expect(fake.openedSources.last.uri, 'file:///playback.mp4');
     expect(find.text('fake-video'), findsOneWidget);
-    expect(find.text('fallback'), findsNothing);
 
     fake.emit(const PlaybackSnapshot(phase: PlaybackPhase.completed));
     await tester.pump();

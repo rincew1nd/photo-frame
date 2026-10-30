@@ -316,6 +316,10 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
   }
 
   bool _hasDisplayFile(CachedAsset asset) {
+    if (asset.type == MediaKind.livePhoto &&
+        asset.livePhotoVideoId != null) {
+      return fileIfExists(asset.liveVideoPath) != null;
+    }
     if (fileIfExists(asset.derivedImagePath) != null) {
       return true;
     }

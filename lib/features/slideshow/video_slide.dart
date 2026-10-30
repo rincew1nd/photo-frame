@@ -42,14 +42,20 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
   bool _completedNotified = false;
   bool _errorNotified = false;
   bool _fallbackAttempted = false;
+  bool _hasStarted = false;
 
   @override
   void initState() {
     super.initState();
-    final playback = ref.read(mediaPlaybackFactoryProvider)();
-    _playback = playback;
-    _subscription = playback.snapshots.listen(_onSnapshot);
-    unawaited(_open());
+    // Defer player creation until after the first frame so the still/fallback
+    // renders immediately instead of waiting on media_kit startup.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final playback = ref.read(mediaPlaybackFactoryProvider)();
+      setState(() => _playback = playback);
+      _subscription = playback.snapshots.listen(_onSnapshot);
+      unawaited(_open());
+    });
   }
 
   Future<void> _open() async {
@@ -88,6 +94,10 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
   void _onSnapshot(PlaybackSnapshot snapshot) {
     if (!mounted) {
       return;
+    }
+    if (snapshot.phase == PlaybackPhase.playing ||
+        snapshot.phase == PlaybackPhase.completed) {
+      _hasStarted = true;
     }
     setState(() => _snapshot = snapshot);
     if (snapshot.phase == PlaybackPhase.completed) {
@@ -183,9 +193,16 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     final playback = _playback;
     if (playback == null ||
         _sourceError ||
-        _snapshot.phase == PlaybackPhase.failed) {
+        _snapshot.phase == PlaybackPhase.failed ||
+        !_hasStarted) {
       return widget.fallback;
     }
-    return SizedBox.expand(child: playback.video(fit: widget.fit));
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        widget.fallback,
+        SizedBox.expand(child: playback.video(fit: widget.fit)),
+      ],
+    );
   }
 }
