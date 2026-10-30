@@ -177,7 +177,6 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
     final showsOverlays =
         !state.nightMode || !settings.nightMode.hideOverlays;
     final motion =
-        !isVideo &&
         fit == ImageFit.cover &&
         profile.imageMotion &&
         profile.panStrength > 0;
@@ -309,9 +308,16 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
     }
     final thumbnail = fileIfExists(cached.thumbnailPath);
     final boxFit = fit == ImageFit.cover ? BoxFit.cover : BoxFit.contain;
+    final imageAspect = _imageAspect(cached, current);
+    final slideSeconds =
+        cached.type == MediaKind.video &&
+            settings.playback.videoPlaybackMode == VideoPlaybackMode.full &&
+            (current?.duration ?? 0) > 0
+        ? ((current!.duration! + 999) ~/ 1000).clamp(2, 300)
+        : intervalSeconds;
     if (cached.type == MediaKind.video &&
         settings.playback.videoPlaybackMode == VideoPlaybackMode.full) {
-      return VideoSlide(
+      final video = VideoSlide(
         key: ValueKey<String>('video-${cached.id}'),
         sourceBuilder: () => _playbackSourceFor(cached),
         fallbackSourceBuilder: () => _videoFallbackSourceFor(cached),
@@ -323,8 +329,22 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
             .read(slideshowControllerProvider.notifier)
             .advanceIfCurrent(cached.id),
       );
+      if (!motion) {
+        return video;
+      }
+      return _KenBurns(
+        key: ValueKey<String>(
+          'ken-burns-video-${cached.id}-${profile.panStrength}-$imageAspect',
+        ),
+        enabled: motion,
+        pan: profile.panStrength,
+        imageAspect: imageAspect,
+        imageFile: display,
+        intervalSeconds: slideSeconds,
+        progress: progress,
+        child: video,
+      );
     }
-    final imageAspect = _imageAspect(cached, current);
     if (cached.type == MediaKind.livePhoto &&
         settings.playback.livePhotoMode != LivePhotoMode.off) {
       return _KenBurns(
@@ -335,7 +355,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
         pan: profile.panStrength,
         imageAspect: imageAspect,
         imageFile: display,
-        intervalSeconds: intervalSeconds,
+        intervalSeconds: slideSeconds,
         progress: progress,
         child: LivePhotoSlide(
           key: ValueKey<String>('live-${cached.id}'),
@@ -356,7 +376,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
       pan: profile.panStrength,
       imageAspect: imageAspect,
       imageFile: display,
-      intervalSeconds: intervalSeconds,
+      intervalSeconds: slideSeconds,
       progress: progress,
       child: _SlideImage(file: display, thumbnail: thumbnail, fit: boxFit),
     );

@@ -499,6 +499,68 @@ void main() {
     expect(controller.advanceCalls, 1);
   });
 
+  testWidgets('full video mode pans the video in cover mode', (tester) async {
+    final dir = _tempDir();
+    final thumbnail = (await tester.runAsync(
+      () => _sizedImage(dir, 'video-thumb', 1920, 1080),
+    ))!;
+    final videoFile = File('${dir.path}/video.mp4')
+      ..writeAsBytesSync(<int>[0, 1, 2, 3]);
+    final fake = FakeMediaPlayback();
+    addTearDown(fake.dispose);
+    await _pump(
+      tester,
+      SlideshowViewState(
+        assets: const <ImmichAsset>[
+          ImmichAsset(id: 'v1', type: MediaKind.video, duration: 2000),
+        ],
+        current: const ImmichAsset(
+          id: 'v1',
+          type: MediaKind.video,
+          duration: 2000,
+        ),
+        playing: true,
+        loading: false,
+        cached: <CachedAsset>[
+          CachedAsset(
+            id: 'v1',
+            type: MediaKind.video,
+            originalMimeType: 'video/mp4',
+            originalPath: videoFile.path,
+            thumbnailPath: thumbnail.path,
+            width: 1920,
+            height: 1080,
+            cachedAt: DateTime.utc(2026),
+            lastAccessedAt: DateTime.utc(2026),
+          ),
+        ],
+      ),
+      settings: const AppSettings(
+        overlays: OverlaySettings(clock: false),
+        defaultProfile: AspectProfile(
+          fit: ImageFit.cover,
+          imageMotion: true,
+          panStrength: 80,
+        ),
+        playback: PlaybackSettings(
+          videoPlaybackMode: VideoPlaybackMode.full,
+          intervalSeconds: 2,
+        ),
+      ),
+      overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
+    );
+
+    expect(find.text('fake-video'), findsOneWidget);
+    final frame = tester.widget<Transform>(
+      find.byKey(const ValueKey<String>('ken-burns-frame')),
+    );
+    final translation = frame.transform.getTranslation();
+    final moved = translation.x.abs() > 1e-3 || translation.y.abs() > 1e-3;
+    final scaled = (frame.transform.getMaxScaleOnAxis() - 1).abs() > 1e-3;
+    expect(moved || scaled, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('mute control saves the muted setting', (tester) async {
     final dir = _tempDir();
     final thumbnail = _image(dir, 'video-thumb');
@@ -954,10 +1016,14 @@ void main() {
       overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
     );
     expect(find.text('fake-video'), findsOneWidget);
-    expect(
+    final frame = tester.widget<Transform>(
       find.byKey(const ValueKey<String>('ken-burns-frame')),
-      findsOneWidget,
     );
+    final translation = frame.transform.getTranslation();
+    final moved = translation.x.abs() > 1e-3 || translation.y.abs() > 1e-3;
+    final scaled = (frame.transform.getMaxScaleOnAxis() - 1).abs() > 1e-3;
+    expect(moved || scaled, isTrue);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('shows the still when the live photo mode is off', (tester) async {
