@@ -1,8 +1,5 @@
 # Plugin Author Guide
 
-Status: Draft v0.1 (plugin API v1)
-Related: [`plugins.md`](plugins.md), [`security.md`](security.md)
-
 ## Bundle
 
 A plugin is a ZIP whose root contains `plugin.json` and `index.html`. CSS,

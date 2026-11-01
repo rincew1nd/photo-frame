@@ -1,17 +1,5 @@
 # Plugin System
 
-Status: Draft v0.4 (design target; Phase 4 in progress)
-Related: [`architecture.md`](architecture.md), [`security.md`](security.md),
-[`requirements-alignment.md`](requirements-alignment.md)
-
-> Implementation status (2026-11-01): Phase 4 is implemented: manifest/ZIP validation, DB v4, the
-> plugin store/seeder, loopback host, webview adapters, snapshot/bridge/session, management UI,
-> slideshow placement with drag/resize/grid, and bundled examples. Clock, weather, and metadata are
-> bundled example plugins enabled by default; no compiled overlay remains. Windows CEF and Android
-> WebView 156 runtime paths were verified; the
-> Windows implementation uses the software pixel-buffer path because the GPU shared-texture path
-> failed Flutter external-texture creation. The 72-hour video/frame-drop soak remains a Phase 6 gate.
-
 ## 1. Model
 
 A plugin is a self-contained ZIP bundle containing:
@@ -257,11 +245,11 @@ its dedicated settings screen, which shows:
 ### Per-instance transparent webview
 
 - One transparent webview per plugin instance.
-- Desktop: CEF via `webview_cef`, rendered offscreen into a Flutter texture. Phase 0 found that
-  `webview_cef` 0.6.2 exposes no transparency/background API; a CEF/OSR transparency patch or an
-  alternative must be proven before production host work.
-- Android: system WebView via `webview_flutter`. Validate on Chromium 100+; the Phase 0 reference
-  WebView was below baseline and rendered plugin HTML blank.
+- Desktop: CEF via the pinned `webview_cef` fork, rendered offscreen into a Flutter texture. The
+  fork adds transparent painting, software pixel-buffer rendering, subprocess hooks, and input/IME
+  fixes.
+- Android: system WebView via `webview_flutter`. Plugins require Chromium 100+. Below that baseline
+  the slideshow runs without overlays.
 - The webview is sized to the plugin box, not the full screen. Clicks outside the box reach Flutter.
 - App controls/dialogs are Flutter widgets above the plugin layer.
 - Android fallback: if platform-view z-order prevents Flutter controls from appearing above

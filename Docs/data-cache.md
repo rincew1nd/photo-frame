@@ -1,8 +1,5 @@
 # Data, Authentication, Cache, and Settings
 
-Status: Draft v0.1
-Related: [`architecture.md`](architecture.md), [`media.md`](media.md), [`security.md`](security.md)
-
 ## 1. Immich API
 
 The app talks directly to an Immich server. No intermediary service is deployed.
@@ -172,7 +169,7 @@ default. The onboarding tour can deep-link to a group.
 - New settings have defaults.
 - Plugin config migrations follow the plugin settings schema; incompatible updates require
   confirmation.
-- MR-04’s legacy upgrade mapping is removed for this new application (fresh install defaults).
+- Fresh installs enable all three media types; no legacy settings migration is performed.
 
 ## 5. Plugin data
 
@@ -191,8 +188,7 @@ default. The onboarding tour can deep-link to a group.
 - Weather data is exposed to that plugin through the snapshot only when available; the compiled
   overlay toggle no longer gates fetching.
 - Failures return null to plugins; they do not block slideshow playback.
-- Location can be configured manually or derived from EXIF/device location with permission. The
-  exact provider and location strategy are implemented in Phase 2/3.
+- Location can be configured manually or derived from EXIF or device location with permission.
 
 ## 7. Background operation
 

@@ -40,9 +40,7 @@ repo root, copies the split `*-release.apk` files from
 `build/app/outputs/flutter-apk` to `dist/photo-frame-android`, and writes
 `sha256sums.txt` next to them. The output directory is printed.
 
-Android release signing and GitHub publishing are not handled by these
-scripts. Both remain separate and blocked until a signing key and a publishing
-workflow are set up.
+Android release signing and GitHub publishing are not handled by these scripts.
 
 # Native still codec scripts
 
@@ -89,13 +87,10 @@ third_party/stills/
 `third_party/stills/` is gitignored. CI caches this directory keyed on the fetch
 scripts (see `.github/workflows/ci.yml`).
 
-## Verification status
+## Fallback
 
-`fetch-stills-deps.ps1` parsed successfully under Windows PowerShell 5.1. The
-full native still build was not rerun in the latest verification; earlier
-Windows native stills were built locally (see `../Docs/phase-3-verification.md`).
-Without the built libraries the app falls back to Immich preview images for
-HEIC, AVIF, and RAW stills.
+Without the built libraries the app falls back to Immich preview images for HEIC,
+AVIF, and RAW stills.
 
 ## Upstream build notes
 

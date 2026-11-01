@@ -1,8 +1,5 @@
 # Security and Privacy
 
-Status: Draft v0.1
-Related: [`plugins.md`](plugins.md), [`data-cache.md`](data-cache.md), [`licensing.md`](licensing.md)
-
 ## 1. Assets to protect
 
 - Immich API key and OAuth tokens.
@@ -38,11 +35,6 @@ installed plugin bundles, the local plugin server, the webview/CEF engine, and t
 - The app never sends credentials to plugins or third-party services.
 - Immich connection may be HTTP on a LAN; the UI should warn when the URL is not HTTPS. TLS
   certificate validation is not disabled.
-
-> Status: plugin-related items throughout this document describe the Phase 4 design target. Phase 4
-> is in progress: manifest/ZIP validation, DB v4, the store/seeder, loopback host, and webview
-> adapters exist; bridge/snapshot, UI, placement, and bundled examples are not implemented yet.
-> Android runtime validation is blocked by a MIUI USB-install restriction.
 
 ## 4. Plugin sandbox
 
@@ -122,13 +114,11 @@ reduce exposure; do not expose the server on non-loopback interfaces.
 
 ## 7. Updates
 
-- Android release builds currently use the debug signing key. No release keystore or GitHub release
-  channel is configured.
 - In-app update checks, APK download/install, and desktop update flows are not implemented. No update
   path currently exists.
-- When implemented, Android APK updates must be signed; the system installer verifies the signature
-  and package identity.
-- Desktop artifacts should be published with checksums when a release channel exists.
+- Android APK updates, when added, must be signed; the system installer verifies signature and
+  package identity.
+- Desktop artifacts are published with checksums.
 - In-app update checks must not execute arbitrary remote code.
 - Plugin updates are local ZIP imports, not remote code fetch.
 - Release notes document permission or security changes.
@@ -144,10 +134,9 @@ reduce exposure; do not expose the server on non-loopback interfaces.
 ## 9. Biometrics
 
 - Android: biometric/device credential gate for media selection and API-key reveal/copy when a lock
-  exists; fail-open without a lock (BR-07). Code-level gating is implemented; device verification is
-  pending.
-- Windows: Windows Hello if available; fail-open otherwise. Not runtime-verified.
-- Linux: no standard equivalent; fail-open and document. Not runtime-verified.
+  exists; fails open without a lock (BR-07).
+- Windows: Windows Hello if available; fails open otherwise.
+- Linux: no standard equivalent; fails open.
 - Biometric prompts do not expose secrets; failure returns to the app without revealing data.
 
 ## 10. DoS and resource limits
@@ -167,7 +156,7 @@ reduce exposure; do not expose the server on non-loopback interfaces.
 - Crash reports are local; no automatic upload.
 - About & diagnostics shows app version/build, plugin API v1, platform/OS version, cache statistics,
   recent redacted logs, error count with copy, and opens the Flutter license page.
-- WebView/CEF versions are not shown; Phase 4 is not started.
+- WebView/CEF versions are not shown in diagnostics.
 - Plugin errors are attributed by plugin ID/instance without leaking library data.
 - Log sharing is user-initiated.
 
@@ -183,14 +172,14 @@ reduce exposure; do not expose the server on non-loopback interfaces.
 | CEF/webview engine vulnerabilities | Keep CEF/system WebView updated; pin/bump releases |
 | HTTP Immich URL on LAN | Warn; user chooses; TLS validation remains on |
 | Unencrypted local media cache | OS disk encryption boundary |
-| No release channel or release signing; Android release builds use debug signing | Open; blocks update flow and signature continuity |
+| No in-app update path or update-signature verification | Accepted for v1; users install published artifacts manually |
 | Plugin icons/screenshots could contain misleading content | Shown as untrusted images; user consents |
 
 ## 13. Security testing
 
-Current automated coverage includes secret redaction, settings migrations, cache, and API-key
-reveal/copy gating. Plugin, loopback-server, and update-signature tests are pending Phase 4 and
-release work.
+Automated coverage includes secret redaction, settings migrations, cache, API-key reveal/copy
+gating, plugin ZIP/manifest validation, bridge/session policy, and loopback-server isolation.
+Update-signature testing does not apply until an update flow exists.
 
 - Secret redaction tests.
 - ZIP traversal/bomb/oversize tests.
@@ -199,5 +188,4 @@ release work.
 - Links: external confirmation, blocked schemes/popups.
 - Action/permission/rate-limit tests.
 - Loopback server path/traversal/token tests.
-- Update signature/package checks (pending release signing and update flow).
 - Soak/failure injection: hung plugin, killed webview, disk full, auth revoked.
