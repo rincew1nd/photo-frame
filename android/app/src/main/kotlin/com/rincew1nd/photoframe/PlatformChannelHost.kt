@@ -11,6 +11,8 @@ import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
 import android.view.WindowManager
+import android.webkit.WebSettings
+import android.webkit.WebView
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -174,6 +176,27 @@ class PlatformChannelHost(private val activity: Activity) : MethodChannel.Method
                     false
                 }
                 result.success(started)
+            }
+            "webViewInfo" -> {
+                try {
+                    val packageInfo = WebView.getCurrentWebViewPackage()
+                    val userAgent = WebSettings.getDefaultUserAgent(activity)
+                    val chromeMajor = Regex("Chrome/(\\d+)")
+                        .find(userAgent)
+                        ?.groupValues
+                        ?.get(1)
+                        ?.toIntOrNull()
+                    result.success(
+                        mapOf(
+                            "packageName" to packageInfo?.packageName,
+                            "versionName" to packageInfo?.versionName,
+                            "userAgent" to userAgent,
+                            "chromeMajor" to chromeMajor,
+                        )
+                    )
+                } catch (_: Exception) {
+                    result.success(null)
+                }
             }
             else -> result.notImplemented()
         }

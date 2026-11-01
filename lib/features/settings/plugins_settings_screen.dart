@@ -35,9 +35,35 @@ class _InstalledPluginsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final plugins = ref.watch(installedPluginsProvider);
+    final support = ref.watch(webViewSupportProvider).value;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        if (support != null && !support.supported)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Card(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: ListTile(
+                leading: Icon(
+                  Icons.warning_amber,
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
+                title: Text(
+                  'Plugins are unavailable',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
+                ),
+                subtitle: Text(
+                  support.message,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
+                ),
+              ),
+            ),
+          ),
         const SettingsSectionHeader('Installed plugins'),
         ...plugins.when(
           loading: () => const <Widget>[

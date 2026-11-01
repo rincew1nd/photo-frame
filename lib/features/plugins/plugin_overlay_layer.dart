@@ -55,11 +55,18 @@ class PluginOverlayLayer extends ConsumerWidget {
     if (!slideshowVisible) {
       return const SizedBox.shrink();
     }
+    final support = ref.watch(webViewSupportProvider);
+    if (support.isLoading) {
+      return const SizedBox.shrink();
+    }
+    final webView = support.value;
+    if (webView == null || !webView.supported) {
+      return const SizedBox.shrink();
+    }
     // Keep the boxes alive but out of the way while the controls are open.
     // Disposing them restarts each host server and causes reload flicker.
     final plugins =
-        ref.watch(installedPluginsProvider).value ??
-        const <InstalledPlugin>[];
+        ref.watch(installedPluginsProvider).value ?? const <InstalledPlugin>[];
     final appVersion = ref.watch(hostAppVersionProvider).value ?? '0.0.0';
     final visible = <InstalledPlugin>[
       for (final plugin in plugins)
@@ -667,10 +674,7 @@ class _PluginBoxState extends ConsumerState<_PluginBox> {
                 onPanCancel: _endInteraction,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    border: Border.all(
-                      color: Colors.lightBlueAccent,
-                      width: 2,
-                    ),
+                    border: Border.all(color: Colors.lightBlueAccent, width: 2),
                   ),
                   child: Align(
                     alignment: Alignment.topLeft,

@@ -66,17 +66,20 @@ final FutureProvider<List<InstalledPlugin>> installedPluginsProvider =
       (ref) => ref.watch(pluginStoreProvider).list(),
     );
 
-final FutureProvider<String> hostAppVersionProvider = FutureProvider<String>(
-  (ref) async {
-    try {
-      return (await PackageInfo.fromPlatform()).version;
-    } on Object {
-      // ponytail: fall back to the minimum supported app version when package
-      // metadata is unavailable (e.g. widget tests).
-      return '0.0.0';
-    }
-  },
-);
+final FutureProvider<String> hostAppVersionProvider = FutureProvider<String>((
+  ref,
+) async {
+  try {
+    return (await PackageInfo.fromPlatform()).version;
+  } on Object {
+    // ponytail: fall back to the minimum supported app version when package
+    // metadata is unavailable (e.g. widget tests).
+    return '0.0.0';
+  }
+});
+
+final FutureProvider<WebViewSupport> webViewSupportProvider =
+    FutureProvider<WebViewSupport>((ref) => const PlatformWebViewInfo().read());
 
 final Provider<PlatformServices> platformServicesProvider =
     Provider<PlatformServices>((ref) => ref.watch(bootstrapProvider).platform);
