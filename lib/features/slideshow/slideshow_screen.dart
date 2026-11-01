@@ -12,13 +12,14 @@ import 'package:photoframe/data/cache/cache_assets.dart';
 import 'package:photoframe/data/immich/models.dart';
 import 'package:photoframe/data/media/playback.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
-import 'package:photoframe/data/weather/weather_service.dart';
 import 'package:photoframe/domain/display/night_mode_service.dart';
 import 'package:photoframe/domain/media/ken_burns.dart';
 import 'package:photoframe/domain/media/media_filters.dart';
+import 'package:photoframe/features/plugins/plugin_overlay_layer.dart';
 import 'package:photoframe/features/slideshow/live_photo_slide.dart';
 import 'package:photoframe/features/slideshow/slideshow_controller.dart';
 import 'package:photoframe/features/slideshow/video_slide.dart';
+import 'package:photoframe/platform/media_session.dart';
 import 'package:photoframe/platform/paths.dart';
 import 'package:photoframe/platform/services.dart';
 
@@ -30,9 +31,11 @@ class SlideshowScreen extends ConsumerStatefulWidget {
   ConsumerState<SlideshowScreen> createState() => _SlideshowScreenState();
 }
 
-class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
+class _SlideshowScreenState extends ConsumerState<SlideshowScreen>
+    with WidgetsBindingObserver {
   bool _controlsVisible = false;
-  bool _weatherRequested = false;
+  bool _pluginEditMode = false;
+  bool _appActive = true;
   String? _derivationAssetId;
   MediaPlayback? _preloadedPlayback;
   String? _preloadedAssetId;
@@ -43,6 +46,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _brightness = ref.read(brightnessServiceProvider);
     ref.listenManual(
       slideshowControllerProvider,
@@ -54,16 +58,6 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
       (previous, next) => _syncBrightness(),
       fireImmediately: true,
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _weatherRequested) {
-        return;
-      }
-      final settings = ref.read(settingsControllerProvider).value;
-      if (settings?.overlays.weather == true) {
-        _weatherRequested = true;
-        ref.read(slideshowControllerProvider.notifier).refreshWeather();
-      }
-    });
   }
 
   void _syncBrightness() {
@@ -84,7 +78,16 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final active = state == AppLifecycleState.resumed;
+    if (active != _appActive) {
+      setState(() => _appActive = active);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_appliedBrightness != null) {
       unawaited(_brightness.setWindowBrightness(null));
     }
@@ -187,7 +190,22 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
   }
 
   void _toggleControls() {
+    if (_pluginEditMode) {
+      // Placement is persisted on drag end; leaving edit mode is enough.
+      setState(() => _pluginEditMode = false);
+      return;
+    }
     setState(() => _controlsVisible = !_controlsVisible);
+  }
+
+  void _enterPluginEditMode() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _pluginEditMode = true;
+      _controlsVisible = false;
+    });
   }
 
   void _scheduleDerivation(CachedAsset? cached) {
@@ -220,16 +238,6 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
     final settings =
         ref.watch(settingsControllerProvider).value ?? const AppSettings();
     final asyncState = ref.watch(slideshowControllerProvider);
-    if (!_weatherRequested &&
-        settings.overlays.weather &&
-        asyncState.hasValue) {
-      _weatherRequested = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          ref.read(slideshowControllerProvider.notifier).refreshWeather();
-        }
-      });
-    }
     final kiosk =
         (Platform.isWindows || Platform.isLinux) && settings.automation.kiosk;
     return Focus(
@@ -337,7 +345,6 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
             settings.playback.livePhotoMode == LivePhotoMode.bounce)
         ? LivePhotoMode.loop
         : settings.playback.livePhotoMode;
-    final showsOverlays = !state.nightMode || !settings.nightMode.hideOverlays;
     final motion =
         fit == ImageFit.cover && profile.imageMotion && profile.panStrength > 0;
     final media = _media(
@@ -355,6 +362,8 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
     // Build the current slide first so it can claim a finished preload before
     // scheduling the one for the new next asset.
     _schedulePreload(state, settings, liveMode);
+    final backgroundMedia =
+        ref.watch(backgroundMediaProvider).value ?? BackgroundMediaState.none;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _toggleControls,
@@ -372,36 +381,18 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
               ),
             ),
           ),
+          PluginOverlayLayer(
+            state: state,
+            settings: settings,
+            editMode: _pluginEditMode,
+            media: backgroundMedia,
+            onEditRequested: _enterPluginEditMode,
+            appActive: _appActive,
+            controlsVisible: _controlsVisible,
+          ),
           if (isVideo &&
               settings.playback.videoPlaybackMode != VideoPlaybackMode.full)
             const Positioned.fill(child: IgnorePointer(child: _VideoLabel())),
-          if (showsOverlays)
-            Positioned.fill(
-              child: SafeArea(
-                child: Stack(
-                  children: [
-                    if (settings.overlays.clock)
-                      const Positioned(
-                        top: 16,
-                        left: 16,
-                        child: _ClockOverlay(),
-                      ),
-                    if (settings.overlays.weather && state.weather != null)
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: _weatherOverlay(state.weather!),
-                      ),
-                    if (settings.overlays.metadata && current?.exif != null)
-                      Positioned(
-                        left: 16,
-                        bottom: 96,
-                        child: _metadataOverlay(current!),
-                      ),
-                  ],
-                ),
-              ),
-            ),
           if (state.nightMode)
             Positioned.fill(
               child: IgnorePointer(
@@ -423,7 +414,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
                 ),
               ),
             ),
-          _controls(state, settings),
+          _controls(state, settings, backgroundMedia),
         ],
       ),
     );
@@ -699,53 +690,22 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
     );
   }
 
-  Widget _weatherOverlay(WeatherSnapshot weather) {
-    final symbol = weather.unit.toLowerCase() == 'fahrenheit' ? '°F' : '°C';
-    final location = weather.locationLabel.trim();
-    return _overlayText(<String>[
-      '${weather.temperature.round()}$symbol',
-      weather.description,
-      if (location.isNotEmpty) location,
-    ]);
-  }
-
-  Widget _metadataOverlay(ImmichAsset asset) {
-    final exif = asset.exif;
-    final date = exif?.dateTimeOriginal ?? asset.fileCreatedAt;
-    final location = exif?.city ?? exif?.state ?? exif?.country;
-    final description = exif?.description;
-    return _overlayText(<String>[
-      if (date != null) _dateText(date),
-      if (location != null && location.isNotEmpty) location,
-      if (description != null && description.isNotEmpty) description,
-    ]);
-  }
-
-  Widget _overlayText(List<String> lines) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final line in lines)
-          Text(
-            line,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
-              shadows: <Shadow>[Shadow(blurRadius: 8, color: Colors.black)],
-            ),
-          ),
-      ],
-    );
-  }
-
-  String _dateText(DateTime date) {
-    final month = date.month.toString().padLeft(2, '0');
-    final day = date.day.toString().padLeft(2, '0');
-    return '${date.year}-$month-$day';
-  }
-
-  Widget _controls(SlideshowViewState state, AppSettings settings) {
+  Widget _controls(
+    SlideshowViewState state,
+    AppSettings settings,
+    BackgroundMediaState media,
+  ) {
     final controller = ref.read(slideshowControllerProvider.notifier);
+    final mediaSession = ref.read(mediaSessionServiceProvider);
+    final playing = media.hasSession ? media.playing : state.playing;
+    void controlMedia(MediaControl control, VoidCallback fallback) {
+      if (media.hasSession) {
+        unawaited(mediaSession.control(control));
+      } else {
+        fallback();
+      }
+    }
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: AnimatedOpacity(
@@ -775,54 +735,30 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
                         tooltip: 'Previous',
                         icon: const Icon(Icons.skip_previous),
                         color: Colors.white,
-                        onPressed: controller.previous,
+                        onPressed: () => controlMedia(
+                          MediaControl.previous,
+                          controller.previous,
+                        ),
                       ),
                       IconButton(
-                        tooltip: state.playing ? 'Pause' : 'Play',
+                        tooltip: playing ? 'Pause' : 'Play',
                         icon: Icon(
-                          state.playing ? Icons.pause : Icons.play_arrow,
+                          playing ? Icons.pause : Icons.play_arrow,
                         ),
                         color: Colors.white,
-                        onPressed: controller.togglePause,
+                        onPressed: () => controlMedia(
+                          MediaControl.toggle,
+                          controller.togglePause,
+                        ),
                       ),
                       IconButton(
                         tooltip: 'Next',
                         icon: const Icon(Icons.skip_next),
                         color: Colors.white,
-                        onPressed: controller.next,
-                      ),
-                      IconButton(
-                        tooltip: 'Settings',
-                        icon: const Icon(Icons.settings_outlined),
-                        color: Colors.white,
-                        onPressed: () => context.push('/settings'),
-                      ),
-                      IconButton(
-                        tooltip: 'Albums',
-                        icon: const Icon(Icons.photo_library_outlined),
-                        color: Colors.white,
-                        onPressed: () => context.go('/albums'),
-                      ),
-                      IconButton(
-                        tooltip: 'Sync',
-                        icon: state.syncing
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.sync),
-                        color: Colors.white,
-                        onPressed: state.syncing ? null : controller.syncNow,
-                      ),
-                      IconButton(
-                        tooltip: 'Media selection',
-                        icon: const Icon(Icons.checklist),
-                        color: Colors.white,
-                        onPressed: () => context.push('/media-selection'),
+                        onPressed: () => controlMedia(
+                          MediaControl.next,
+                          controller.next,
+                        ),
                       ),
                       IconButton(
                         tooltip: settings.playback.muted
@@ -845,6 +781,44 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
                                 ),
                               );
                         },
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      IconButton(
+                        tooltip: 'Albums',
+                        icon: const Icon(Icons.photo_library_outlined),
+                        color: Colors.white,
+                        onPressed: () => context.go('/albums'),
+                      ),
+                      IconButton(
+                        tooltip: 'Media selection',
+                        icon: const Icon(Icons.checklist),
+                        color: Colors.white,
+                        onPressed: () => context.push('/media-selection'),
+                      ),
+                      IconButton(
+                        tooltip: 'Update album',
+                        icon: state.syncing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.sync),
+                        color: Colors.white,
+                        onPressed: state.syncing ? null : controller.syncNow,
+                      ),
+                      IconButton(
+                        tooltip: 'Settings',
+                        icon: const Icon(Icons.settings_outlined),
+                        color: Colors.white,
+                        onPressed: () => context.push('/settings'),
                       ),
                     ],
                   ),
@@ -973,50 +947,6 @@ class _VideoLabel extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ClockOverlay extends StatefulWidget {
-  const _ClockOverlay();
-
-  @override
-  State<_ClockOverlay> createState() => _ClockOverlayState();
-}
-
-class _ClockOverlayState extends State<_ClockOverlay> {
-  late DateTime _now = DateTime.now();
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() => _now = DateTime.now());
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _timer = null;
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final hours = _now.hour.toString().padLeft(2, '0');
-    final minutes = _now.minute.toString().padLeft(2, '0');
-    return Text(
-      '$hours:$minutes',
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 32,
-        fontWeight: FontWeight.w300,
-        shadows: <Shadow>[Shadow(blurRadius: 8, color: Colors.black)],
       ),
     );
   }

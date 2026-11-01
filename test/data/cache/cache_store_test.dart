@@ -257,20 +257,23 @@ void main() {
   });
 
   group('DriftCacheStore', () {
-    test('persists assets, sync state, and schema version 3', () async {
+    test('persists assets, sync state, and schema version 4', () async {
       AppDatabase? database;
       try {
         database = AppDatabase(NativeDatabase.memory());
         final store = DriftCacheStore(database);
         await store.init();
 
-        expect(database.schemaVersion, 3);
+        expect(database.schemaVersion, 4);
         final tables = await database
             .customSelect("SELECT name FROM sqlite_master WHERE type = 'table'")
             .get();
         final names = tables.map((row) => row.read<String>('name')).toSet();
         expect(names, contains('cached_assets'));
         expect(names, contains('album_sync_states'));
+        expect(names, contains('plugin_registry'));
+        expect(names, contains('plugin_instances'));
+        expect(names, contains('plugin_storage'));
 
         final asset = makeAsset(
           id: 'asset-1',

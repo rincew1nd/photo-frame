@@ -153,8 +153,8 @@ desktop with `adb forward tcp:8080 tcp:35535`, and loaded in Chrome 155:
 - **Transparent plugin overlays:** conditional no-go for Phase 4. Android reference WebView is below
   baseline and renders blank; desktop CEF has no exposed transparency API in `webview_cef` 0.6.2.
   Resolve transparency (patch CEF/OSR or evaluate another host) and validate on a modern Android
-  WebView before production plugin work. The agreed fallback is to disable plugins below the Android
-  WebView baseline while keeping built-in overlays.
+  WebView before production plugin work. Below the Android WebView baseline, plugins are disabled;
+  compiled overlays have since been removed.
 - **Linux:** not verified. Performance, transparency, and Wayland/X11 startup remain open.
 
 ### Architecture impact
@@ -206,4 +206,4 @@ Screenshots and logs are under [`evidence/`](evidence/):
 - Phase 3: resolve HEVC 10-bit and tone-mapping before claiming original playback; add the Immich
   playback-stream fallback and diagnostics.
 - Phase 4: do not build the plugin host against the blank-webview reference. Validate CEF
-  transparency and a Chromium 100+ Android WebView; otherwise ship built-in overlays only.
+  transparency and a Chromium 100+ Android WebView before relying on plugins.

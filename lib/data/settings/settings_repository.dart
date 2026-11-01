@@ -137,6 +137,10 @@ AppSettings migrate(Map<String, dynamic> json) {
     _migrateV2ToV3(data);
   }
 
+  if (parsedVersion < 4) {
+    _migrateV3ToV4(data);
+  }
+
   return AppSettings.fromJson(data);
 }
 
@@ -211,6 +215,15 @@ void _migrateV2ToV3(Map<String, dynamic> data) {
   automation.putIfAbsent('startOnBoot', () => false);
   automation.putIfAbsent('kiosk', () => false);
   automation.putIfAbsent('updateChecks', () => false);
+}
+
+void _migrateV3ToV4(Map<String, dynamic> data) {
+  data['schemaVersion'] = 4;
+
+  final plugins = _section(data, 'plugins');
+  plugins.putIfAbsent('gridSnap', () => false);
+  plugins.putIfAbsent('gridSize', () => 16);
+  plugins.putIfAbsent('seededExamplesVersion', () => 0);
 }
 
 Map<String, dynamic> _section(Map<String, dynamic> data, String key) {

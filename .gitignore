@@ -55,3 +55,7 @@ dist/
 # Native still-image codecs
 /third_party/stills/
 android/app/src/main/jniLibs/
+
+# Downloaded CEF runtime
+/third_party/webview_cef/third/cef/
+/third_party/webview_cef/third/prebuilt.zip

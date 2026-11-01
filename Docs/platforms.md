@@ -57,10 +57,11 @@ Pending:
 
 ### WebView and plugins
 
-- Phase 4 is not started; no WebView baseline check or plugin degradation is implemented or verified.
+- Phase 4 is in progress. The `webview_flutter` adapter builds, but Android runtime validation is
+  blocked by a MIUI USB-install restriction despite WebView 156.
 - Planned: plugins use the system WebView (`webview_flutter`), with a proposed Chrome/WebView 100+
   baseline to validate in Phase 4.
-- Planned: clock/weather/metadata ship as bundled plugins, so all overlays depend on WebView.
+- Planned: clock/weather/metadata ship as bundled example plugins, so all overlays depend on WebView.
 - Planned fallback: below baseline, plugins (and therefore all overlays) are disabled with an
   explanatory message; the slideshow continues without overlays.
 

@@ -37,6 +37,50 @@ const String albumSyncStatesTableSql =
     'asset_count INTEGER'
     ')';
 
+const String pluginRegistryTableSql =
+    'CREATE TABLE IF NOT EXISTS plugin_registry ('
+    'id TEXT PRIMARY KEY, '
+    'version TEXT NOT NULL, '
+    'api_version INTEGER NOT NULL, '
+    'manifest_json TEXT NOT NULL, '
+    'bundle_path TEXT NOT NULL, '
+    'sha256 TEXT NOT NULL, '
+    'enabled INTEGER NOT NULL, '
+    'source TEXT NOT NULL, '
+    'installed_at INTEGER NOT NULL, '
+    'updated_at INTEGER NOT NULL'
+    ')';
+
+const String pluginInstancesTableSql =
+    'CREATE TABLE IF NOT EXISTS plugin_instances ('
+    'plugin_id TEXT PRIMARY KEY, '
+    'x REAL, '
+    'y REAL, '
+    'width REAL NOT NULL, '
+    'height REAL NOT NULL, '
+    'z_order INTEGER NOT NULL, '
+    'show_during_night INTEGER NOT NULL, '
+    'config_json TEXT NOT NULL, '
+    'visible INTEGER NOT NULL, '
+    'updated_at INTEGER NOT NULL'
+    ')';
+
+const String pluginStorageTableSql =
+    'CREATE TABLE IF NOT EXISTS plugin_storage ('
+    'plugin_id TEXT NOT NULL, '
+    'key TEXT NOT NULL, '
+    'value TEXT NOT NULL, '
+    'updated_at INTEGER NOT NULL, '
+    'PRIMARY KEY(plugin_id, key)'
+    ')';
+
+// Seed/migration markers (for example, whether bundled examples were seeded).
+const String pluginMetaTableSql =
+    'CREATE TABLE IF NOT EXISTS plugin_meta ('
+    'key TEXT PRIMARY KEY, '
+    'value TEXT NOT NULL'
+    ')';
+
 class AppDatabase extends GeneratedDatabase {
   AppDatabase(super.executor);
 
@@ -49,7 +93,7 @@ class AppDatabase extends GeneratedDatabase {
       const <TableInfo<Table, dynamic>>[];
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   static const Map<String, String> _cachedAssetColumns = <String, String>{
     'live_video_path': 'TEXT',
@@ -66,6 +110,10 @@ class AppDatabase extends GeneratedDatabase {
         .get();
     await customStatement(cachedAssetsTableSql);
     await customStatement(albumSyncStatesTableSql);
+    await customStatement(pluginRegistryTableSql);
+    await customStatement(pluginInstancesTableSql);
+    await customStatement(pluginStorageTableSql);
+    await customStatement(pluginMetaTableSql);
     final info = await customSelect('PRAGMA table_info(cached_assets)').get();
     final existing = info.map((row) => row.read<String>('name')).toSet();
     for (final column in _cachedAssetColumns.entries) {

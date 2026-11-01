@@ -16,7 +16,6 @@ const AppSettings _updated = AppSettings(
     livePhotoMode: LivePhotoMode.loop,
   ),
   defaultProfile: AspectProfile(fit: ImageFit.cover, panStrength: 0),
-  overlays: OverlaySettings(clock: false),
 );
 
 void main() {
@@ -51,7 +50,7 @@ void main() {
     final playback = decoded['playback'] as Map<String, dynamic>;
     expect(playback['intervalSeconds'], 42);
     expect(playback['livePhotoMode'], 'loop');
-    expect((decoded['overlays'] as Map<String, dynamic>)['clock'], isFalse);
+    expect(decoded.containsKey('overlays'), isFalse);
     expect(File('${file.path}.tmp').existsSync(), isFalse);
   });
 
@@ -91,7 +90,6 @@ void main() {
     expect(loaded.playback.livePhotoMode, LivePhotoMode.loop);
     expect(loaded.defaultProfile.panStrength, 0);
     expect(loaded.playback.intervalSeconds, 42);
-    expect(loaded.overlays.clock, isFalse);
   });
 
   test('controller save is durable and survives a restart', () async {

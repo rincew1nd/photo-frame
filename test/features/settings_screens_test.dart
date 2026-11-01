@@ -9,6 +9,7 @@ import 'package:photoframe/app/providers.dart';
 import 'package:photoframe/core/logging/app_logger.dart';
 import 'package:photoframe/data/cache/cache_assets.dart';
 import 'package:photoframe/data/cache/cache_store.dart';
+import 'package:photoframe/data/plugins/plugin_store.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/data/settings/settings_repository.dart';
 import 'package:photoframe/features/settings/about_settings_screen.dart';
@@ -44,6 +45,9 @@ Future<void> _pump(
         settingsRepositoryProvider.overrideWithValue(repository),
         cacheStoreProvider.overrideWithValue(cacheStore ?? MemoryCacheStore()),
         appLoggerProvider.overrideWithValue(logger ?? AppLogger()),
+        installedPluginsProvider.overrideWith(
+          (ref) async => <InstalledPlugin>[],
+        ),
         ...overrides,
       ],
       child: MaterialApp(
@@ -380,7 +384,7 @@ void main() {
     expect(find.text('1 error logged'), findsOneWidget);
   });
 
-  testWidgets('plugins screen saves overlays and weather location', (
+  testWidgets('plugins screen lists installed plugins and add action', (
     tester,
   ) async {
     final repository = InMemorySettingsRepository();
@@ -390,26 +394,8 @@ void main() {
       screen: const PluginsSettingsScreen(),
     );
 
-    await tester.tap(find.widgetWithText(SwitchListTile, 'Weather'));
-    await tester.pumpAndSettle();
-    expect((await repository.load()).overlays.weather, isTrue);
-
-    await tester.tap(find.widgetWithText(SwitchListTile, 'Metadata'));
-    await tester.pumpAndSettle();
-    expect((await repository.load()).overlays.metadata, isTrue);
-
-    await tester.tap(find.byKey(const ValueKey<String>('weather-location')));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField), 'Berlin');
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
-    expect((await repository.load()).overlays.weatherLocationLabel, 'Berlin');
-
-    expect(
-      tester
-          .widget<ListTile>(find.widgetWithText(ListTile, 'Add plugin'))
-          .enabled,
-      isFalse,
-    );
+    expect(find.text('Installed plugins'), findsOneWidget);
+    expect(find.text('No plugins installed'), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('add-plugin')), findsOneWidget);
   });
 }

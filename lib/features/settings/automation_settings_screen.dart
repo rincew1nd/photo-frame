@@ -227,12 +227,6 @@ class _AutomationSettingsScreenState
           onChanged: (value) =>
               _saveNight(ref, (night) => night.copyWith(pauseSlideshow: value)),
         ),
-        SwitchListTile(
-          title: const Text('Hide overlays'),
-          value: night.hideOverlays,
-          onChanged: (value) =>
-              _saveNight(ref, (night) => night.copyWith(hideOverlays: value)),
-        ),
         if (night.startMinutes > night.endMinutes)
           const ListTile(
             dense: true,

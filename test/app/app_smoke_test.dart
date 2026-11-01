@@ -4,6 +4,7 @@ import 'package:photoframe/app/app.dart';
 import 'package:photoframe/app/providers.dart';
 import 'package:photoframe/app/router.dart';
 import 'package:photoframe/data/cache/cache_store.dart';
+import 'package:photoframe/data/plugins/plugin_store.dart';
 import 'package:photoframe/data/settings/settings_repository.dart';
 import 'package:photoframe/features/slideshow/slideshow_screen.dart';
 import 'package:photoframe/main.dart';
@@ -45,6 +46,9 @@ void main() {
             InMemorySettingsRepository(),
           ),
           cacheStoreProvider.overrideWithValue(MemoryCacheStore()),
+          installedPluginsProvider.overrideWith(
+            (ref) async => <InstalledPlugin>[],
+          ),
           routerProvider.overrideWithValue(
             createAppRouter(initialLocation: '/settings'),
           ),
@@ -78,6 +82,9 @@ void main() {
             InMemorySettingsRepository(),
           ),
           cacheStoreProvider.overrideWithValue(MemoryCacheStore()),
+          installedPluginsProvider.overrideWith(
+            (ref) async => <InstalledPlugin>[],
+          ),
           routerProvider.overrideWithValue(
             createAppRouter(initialLocation: '/slideshow'),
           ),

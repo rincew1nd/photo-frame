@@ -9,12 +9,25 @@ project(runner LANGUAGES CXX)
 add_executable(${BINARY_NAME} WIN32
   "flutter_window.cpp"
   "main.cpp"
+  "media_session_host.h"
   "utils.cpp"
   "win32_window.cpp"
   "${FLUTTER_MANAGED_DIR}/generated_plugin_registrant.cc"
   "Runner.rc"
   "runner.exe.manifest"
 )
+
+# C++/WinRT needs exceptions, which the standard Flutter runner settings
+# disable. Keep GSMTC in its own target so the rest of the runner is unchanged.
+add_library(media_session STATIC
+  "media_session_host.cpp"
+  "media_session_host.h"
+)
+target_compile_features(media_session PUBLIC cxx_std_20)
+target_compile_options(media_session PRIVATE /EHsc)
+target_compile_definitions(media_session PRIVATE "_HAS_EXCEPTIONS=1" "NOMINMAX")
+target_include_directories(media_session PUBLIC "${CMAKE_SOURCE_DIR}")
+target_link_libraries(media_session PUBLIC flutter flutter_wrapper_app windowsapp)
 
 # Apply the standard set of build settings. This can be removed for applications
 # that need different build settings.
@@ -33,6 +46,7 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 # Add dependency libraries and include directories. Add any application-specific
 # dependencies here.
 target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
+target_link_libraries(${BINARY_NAME} PRIVATE media_session)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 

@@ -37,7 +37,8 @@ package, signing key, settings, or cache.
 - HDR/10-bit originals are decoded and **tone-mapped to SDR**. True HDR output is out of scope.
 - Plugins are HTML/CSS/JS bundles installed from a local ZIP. They are interactive, sandboxed,
   movable/resizable, and able to display icons, descriptions, and screenshots in the install UI.
-- All overlays are plugins; clock, weather, and metadata ship as bundled plugins enabled by default.
+- All overlays are plugins; clock, weather, and metadata ship as bundled example plugins enabled by
+  default and can be disabled or deleted like any third-party plugin.
 - Plugin rendering uses a transparent webview per instance: **CEF via webview_cef** on desktop and
   the **system WebView** on Android.
 - Plugin network access, storage, and app actions are mediated by the host. Plugins never receive
@@ -51,6 +52,7 @@ package, signing key, settings, or cache.
 | [`architecture.md`](architecture.md) | Stack, layers, runtime architecture, repository layout, data flow |
 | [`media.md`](media.md) | Video, audio, stills, Live Photos, HDR policy, format support, fallbacks |
 | [`plugins.md`](plugins.md) | Plugin bundle, manifest, host, sandbox, JS API, placement, lifecycle, limits |
+| [`plugin-author-guide.md`](plugin-author-guide.md) | Manifest, settings, host API v1, limits, and example-plugin starting points |
 | [`data-cache.md`](data-cache.md) | Immich API/auth, cache/offline, settings, database, sync |
 | [`platforms.md`](platforms.md) | Windows, Linux x64, Android behaviour, startup, kiosk, packaging |
 | [`platform-checklists.md`](platform-checklists.md) | Manual Android, Windows, and Linux verification checklists and recorded results |
@@ -73,7 +75,7 @@ known risks.
 | 1 | Foundation | Immich connection/auth, settings, storage, CI |
 | 2 | Photos and cache | Slideshow, offline cache, filters, per-aspect profiles |
 | 3 | Media | Video, Live Photos, audio, HEIC/AVIF, DNG/ProRAW, tone-mapping |
-| 4 | Plugins | ZIP install, sandbox, host bridge, placement, actions, reference plugins |
+| 4 | Plugins | ZIP install, sandbox, host bridge, placement, actions, bundled example plugins |
 | 5 | Platform integration | Boot/launcher, kiosk, sleep prevention, biometrics, updates |
 | 6 | Hardening and release | Soak, security, performance, docs, signed artifacts |
 
@@ -107,9 +109,12 @@ known risks.
   keystore is configured, and Android release builds use the debug signing key.
 - Full kiosk lockdown is incomplete on Windows/Linux: close/alt-tab suppression and multi-monitor
   selection are missing.
-- Phase 4 is not started. Android plugin support/WebView baseline, CEF diagnostics, and the
-  transparent CEF/WebView behavior found in Phase 0 remain open. All overlays are planned as
-  bundled plugins, so below the Android WebView baseline the slideshow would run without overlays.
+- Phase 4 is implemented. Windows CEF transparency/input was proven with the software pixel-buffer
+  path; Android WebView 156 runtime was verified with transparency, input, text/IME, click-through,
+  controls above, and 1 Hz updates. Manifest/ZIP validation, DB v4, store/seeder, loopback host,
+  webview adapters, bridge/session, management UI, slideshow placement, and bundled examples are
+  implemented. The 72-hour video/frame-drop soak remains a Phase 6
+  gate. Below the Android WebView baseline the slideshow runs without overlays.
 - HEVC 10-bit HDR10 failed on the stock Android media_kit build in Phase 0. HDR playback remains
   unverified and may need a custom libmpv/FFmpeg decoder or the Immich playback-stream fallback. AVIF
   and DNG/ProRAW still need libheif/LibRaw builds; HEIC currently depends on the platform decoder.

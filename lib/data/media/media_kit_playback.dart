@@ -102,7 +102,16 @@ class MediaKitPlayback implements MediaPlayback {
   }
 
   @override
-  Future<void> play() => _player.play();
+  Future<void> play() {
+    if (_disposed) {
+      return Future<void>.value();
+    }
+    // media_kit can keep the completed latch set after the stream ends; clear
+    // it so loop mode can start a new pass and emit a non-completed phase.
+    _completed = false;
+    _emit();
+    return _player.play();
+  }
 
   @override
   Future<void> pause() => _player.pause();
@@ -111,7 +120,15 @@ class MediaKitPlayback implements MediaPlayback {
   Future<void> setMuted(bool muted) => _player.setVolume(muted ? 0 : 100);
 
   @override
-  Future<void> seek(Duration position) => _player.seek(position);
+  Future<void> seek(Duration position) {
+    if (_disposed) {
+      return Future<void>.value();
+    }
+    _completed = false;
+    _position = position;
+    _emit();
+    return _player.seek(position);
+  }
 
   @override
   Widget video({required BoxFit fit}) {

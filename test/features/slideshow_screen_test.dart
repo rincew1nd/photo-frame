@@ -12,10 +12,10 @@ import 'package:photoframe/data/immich/models.dart';
 import 'package:photoframe/data/media/playback.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/data/settings/settings_repository.dart';
-import 'package:photoframe/data/weather/weather_service.dart';
 import 'package:photoframe/domain/media/ken_burns.dart';
 import 'package:photoframe/features/slideshow/slideshow_controller.dart';
 import 'package:photoframe/features/slideshow/slideshow_screen.dart';
+import 'package:photoframe/platform/media_session.dart';
 import 'package:photoframe/platform/services.dart';
 
 import '../support/fake_media_playback.dart';
@@ -27,7 +27,6 @@ class _FakeSlideshowController extends SlideshowController {
   int nextCalls = 0;
   int previousCalls = 0;
   int syncCalls = 0;
-  int weatherCalls = 0;
   int advanceCalls = 0;
 
   @override
@@ -52,12 +51,6 @@ class _FakeSlideshowController extends SlideshowController {
   }
 
   @override
-  Future<WeatherSnapshot?> refreshWeather() async {
-    weatherCalls++;
-    return null;
-  }
-
-  @override
   void advanceIfCurrent(String assetId) {
     advanceCalls++;
   }
@@ -70,6 +63,34 @@ class _FakeBrightness implements BrightnessService {
   Future<void> setWindowBrightness(double? brightness) async {
     values.add(brightness);
   }
+}
+
+class _FakeMediaSession implements MediaSessionService {
+  final List<MediaControl> controls = <MediaControl>[];
+
+  @override
+  Stream<BackgroundMediaState> get changes =>
+      const Stream<BackgroundMediaState>.empty();
+
+  @override
+  Future<BackgroundMediaState> get current async => BackgroundMediaState.none;
+
+  @override
+  Stream<BackgroundMediaState> watch() async* {
+    yield BackgroundMediaState.none;
+  }
+
+  @override
+  Future<bool> control(MediaControl control) async {
+    controls.add(control);
+    return true;
+  }
+
+  @override
+  Future<bool> get hasNotificationAccess async => true;
+
+  @override
+  Future<void> openNotificationAccessSettings() async {}
 }
 
 const List<int> _png = <int>[
@@ -201,7 +222,6 @@ CachedAsset _cached(String id, File file) {
 
 AppSettings _settings() {
   return const AppSettings(
-    overlays: OverlaySettings(clock: false),
     defaultProfile: AspectProfile(imageMotion: false),
   );
 }
@@ -319,11 +339,63 @@ void main() {
           .opacity,
       1,
     );
-    expect(find.byTooltip('Sync'), findsOneWidget);
+    expect(find.byTooltip('Update album'), findsOneWidget);
+    expect(find.byTooltip('Sync'), findsNothing);
+    expect(find.byTooltip('Albums'), findsOneWidget);
+    expect(find.byTooltip('Media selection'), findsOneWidget);
+    expect(find.byTooltip('Settings'), findsOneWidget);
+    expect(find.byTooltip('Move'), findsNothing);
     expect(find.byIcon(Icons.sync), findsOneWidget);
     await tester.tap(find.byTooltip('Next'));
     await tester.pumpAndSettle();
     expect(controller.nextCalls, 1);
+  });
+
+  testWidgets('controls drive background media when a session exists', (
+    tester,
+  ) async {
+    final dir = _tempDir();
+    final first = _image(dir, 'first');
+    final session = _FakeMediaSession();
+    final controller = await _pump(
+      tester,
+      SlideshowViewState(
+        assets: const <ImmichAsset>[ImmichAsset(id: 'a1')],
+        current: const ImmichAsset(id: 'a1'),
+        playing: true,
+        loading: false,
+        progress: 0.4,
+        total: 1,
+        cached: <CachedAsset>[_cached('a1', first)],
+      ),
+      overrides: [
+        backgroundMediaProvider.overrideWith(
+          (ref) => Stream<BackgroundMediaState>.value(
+            const BackgroundMediaState(
+              hasSession: true,
+              title: 'Track',
+              playing: true,
+            ),
+          ),
+        ),
+        mediaSessionServiceProvider.overrideWithValue(session),
+      ],
+    );
+
+    await tester.tapAt(const Offset(400, 300));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Previous'));
+    await tester.tap(find.byTooltip('Pause'));
+    await tester.tap(find.byTooltip('Next'));
+    await tester.pumpAndSettle();
+
+    expect(session.controls, <MediaControl>[
+      MediaControl.previous,
+      MediaControl.toggle,
+      MediaControl.next,
+    ]);
+    expect(controller.previousCalls, 0);
+    expect(controller.nextCalls, 0);
   });
 
   test(
@@ -497,7 +569,6 @@ void main() {
         _fullVideoState(videoFile: videoFile, thumbnail: thumbnail),
         repository: InMemorySettingsRepository(
           const AppSettings(
-            overlays: OverlaySettings(clock: false),
             defaultProfile: AspectProfile(imageMotion: false),
             playback: PlaybackSettings(
               videoPlaybackMode: VideoPlaybackMode.full,
@@ -554,7 +625,6 @@ void main() {
         ],
       ),
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(
           fit: ImageFit.cover,
           imageMotion: true,
@@ -588,7 +658,6 @@ void main() {
     addTearDown(fake.dispose);
     final repository = InMemorySettingsRepository(
       const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(imageMotion: false),
         playback: PlaybackSettings(
           videoPlaybackMode: VideoPlaybackMode.full,
@@ -673,7 +742,6 @@ void main() {
           settingsRepositoryProvider.overrideWithValue(
             InMemorySettingsRepository(
               const AppSettings(
-                overlays: OverlaySettings(clock: false),
                 defaultProfile: AspectProfile(
                   fit: ImageFit.cover,
                   panStrength: 80,
@@ -725,7 +793,6 @@ void main() {
           settingsRepositoryProvider.overrideWithValue(
             InMemorySettingsRepository(
               const AppSettings(
-                overlays: OverlaySettings(clock: false),
                 defaultProfile: AspectProfile(
                   fit: ImageFit.cover,
                   panStrength: 100,
@@ -785,7 +852,6 @@ void main() {
           settingsRepositoryProvider.overrideWithValue(
             InMemorySettingsRepository(
               const AppSettings(
-                overlays: OverlaySettings(clock: false),
                 defaultProfile: AspectProfile(
                   fit: ImageFit.cover,
                   panStrength: 80,
@@ -839,7 +905,6 @@ void main() {
           settingsRepositoryProvider.overrideWithValue(
             InMemorySettingsRepository(
               const AppSettings(
-                overlays: OverlaySettings(clock: false),
                 defaultProfile: AspectProfile(
                   fit: ImageFit.cover,
                   panStrength: 80,
@@ -897,7 +962,6 @@ void main() {
       ),
       size: const Size(800, 600),
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(
           fit: ImageFit.contain,
           imageMotion: true,
@@ -932,7 +996,6 @@ void main() {
       ),
       size: const Size(400, 800),
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(
           fit: ImageFit.contain,
           panStrength: 0,
@@ -963,7 +1026,6 @@ void main() {
       ),
       size: const Size(400, 800),
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(
           fit: ImageFit.cover,
           panStrength: 0,
@@ -999,7 +1061,6 @@ void main() {
         ],
       ),
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(imageMotion: false),
         playback: PlaybackSettings(livePhotoMode: LivePhotoMode.loop),
       ),
@@ -1036,7 +1097,6 @@ void main() {
           ],
         ),
         settings: const AppSettings(
-          overlays: OverlaySettings(clock: false),
           defaultProfile: AspectProfile(
             fit: ImageFit.contain,
             imageMotion: false,
@@ -1080,7 +1140,6 @@ void main() {
         ],
       ),
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(
           fit: ImageFit.cover,
           imageMotion: true,
@@ -1128,7 +1187,6 @@ void main() {
         ],
       ),
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(imageMotion: false),
         playback: PlaybackSettings(livePhotoMode: LivePhotoMode.off),
       ),
@@ -1174,7 +1232,6 @@ void main() {
         ],
       ),
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(imageMotion: false),
         playback: PlaybackSettings(livePhotoMode: LivePhotoMode.bounce),
       ),
@@ -1214,7 +1271,6 @@ void main() {
         ],
       ),
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(imageMotion: false),
         playback: PlaybackSettings(livePhotoMode: LivePhotoMode.live),
       ),
@@ -1229,6 +1285,109 @@ void main() {
     expect(find.text('fake-video'), findsNothing);
     expect(find.byType(Image), findsWidgets);
     expect(find.text('Live Photo motion in Phase 3'), findsNothing);
+  });
+
+  testWidgets('live photo loop restarts motion after completion', (
+    tester,
+  ) async {
+    final dir = _tempDir();
+    final still = _image(dir, 'live-loop');
+    final motion = File('${dir.path}/loop.mov')
+      ..writeAsBytesSync(<int>[0, 1, 2]);
+    final fake = FakeMediaPlayback();
+    addTearDown(fake.dispose);
+    await _pump(
+      tester,
+      SlideshowViewState(
+        assets: const <ImmichAsset>[
+          ImmichAsset(id: 'lp-loop', type: MediaKind.livePhoto),
+        ],
+        current: const ImmichAsset(id: 'lp-loop', type: MediaKind.livePhoto),
+        playing: true,
+        loading: false,
+        cached: <CachedAsset>[
+          _cached(
+            'lp-loop',
+            still,
+          ).copyWith(type: MediaKind.livePhoto, liveVideoPath: motion.path),
+        ],
+      ),
+      settings: const AppSettings(
+        defaultProfile: AspectProfile(imageMotion: false),
+        playback: PlaybackSettings(livePhotoMode: LivePhotoMode.loop),
+      ),
+      overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
+    );
+    expect(find.text('fake-video'), findsOneWidget);
+    final playsBefore = fake.playCalls;
+
+    fake.emit(
+      const PlaybackSnapshot(
+        phase: PlaybackPhase.completed,
+        duration: Duration(seconds: 2),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(fake.lastSeek, Duration.zero);
+    expect(fake.playCalls, greaterThan(playsBefore));
+    expect(find.text('fake-video'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('live photo bounce reverses and survives mid-bounce disposal', (
+    tester,
+  ) async {
+    final dir = _tempDir();
+    final still = _image(dir, 'live-bounce');
+    final motion = File('${dir.path}/bounce.mov')
+      ..writeAsBytesSync(<int>[0, 1, 2]);
+    final fake = FakeMediaPlayback();
+    addTearDown(fake.dispose);
+    await _pump(
+      tester,
+      SlideshowViewState(
+        assets: const <ImmichAsset>[
+          ImmichAsset(id: 'lp-bounce', type: MediaKind.livePhoto),
+        ],
+        current: const ImmichAsset(
+          id: 'lp-bounce',
+          type: MediaKind.livePhoto,
+        ),
+        playing: true,
+        loading: false,
+        cached: <CachedAsset>[
+          _cached(
+            'lp-bounce',
+            still,
+          ).copyWith(type: MediaKind.livePhoto, liveVideoPath: motion.path),
+        ],
+      ),
+      settings: const AppSettings(
+        defaultProfile: AspectProfile(imageMotion: false),
+        playback: PlaybackSettings(livePhotoMode: LivePhotoMode.bounce),
+      ),
+      overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
+    );
+    expect(find.text('fake-video'), findsOneWidget);
+
+    fake.emit(
+      const PlaybackSnapshot(
+        phase: PlaybackPhase.completed,
+        duration: Duration(seconds: 2),
+      ),
+    );
+    await tester.pump();
+    expect(fake.pauseCalls, greaterThan(0));
+
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(fake.lastSeek, isNotNull);
+
+    // Disposing the slide mid-bounce must not call the disposed player.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('preloads the next live photo player paused', (tester) async {
@@ -1271,7 +1430,6 @@ void main() {
       ),
       preload: true,
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(imageMotion: false),
         playback: PlaybackSettings(livePhotoMode: LivePhotoMode.loop),
       ),
@@ -1283,48 +1441,6 @@ void main() {
     expect(preloaded.openedSource?.uri, motion.path);
     expect(preloaded.openedAutoPlay, isFalse);
     expect(find.text('fake-video'), findsNothing);
-  });
-
-  testWidgets('requests weather on first frame when enabled', (tester) async {
-    final dir = _tempDir();
-    final first = _image(dir, 'first');
-    late _FakeSlideshowController controller;
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          brightnessServiceProvider.overrideWithValue(
-            const UnsupportedBrightness(),
-          ),
-          slideshowControllerProvider.overrideWith(() {
-            controller = _FakeSlideshowController(
-              SlideshowViewState(
-                assets: const <ImmichAsset>[ImmichAsset(id: 'a1')],
-                current: const ImmichAsset(id: 'a1'),
-                loading: false,
-                cached: <CachedAsset>[_cached('a1', first)],
-              ),
-            );
-            return controller;
-          }),
-          settingsRepositoryProvider.overrideWithValue(
-            InMemorySettingsRepository(
-              const AppSettings(
-                overlays: OverlaySettings(
-                  clock: false,
-                  weather: true,
-                  weatherLatitude: 1,
-                  weatherLongitude: 2,
-                ),
-              ),
-            ),
-          ),
-        ],
-        child: const MaterialApp(home: SlideshowScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(controller.weatherCalls, 1);
   });
 
   testWidgets('adaptive background none renders no filtered layer', (
@@ -1341,7 +1457,6 @@ void main() {
         cached: <CachedAsset>[_cached('bg1', first)],
       ),
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(
           imageMotion: false,
           adaptiveBackground: AdaptiveBackground.none,
@@ -1366,7 +1481,6 @@ void main() {
         cached: <CachedAsset>[_cached('bg2', first)],
       ),
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(
           imageMotion: false,
           adaptiveBackground: AdaptiveBackground.blurredCover,
@@ -1393,7 +1507,6 @@ void main() {
         cached: <CachedAsset>[_cached('n1', first)],
       ),
       settings: const AppSettings(
-        overlays: OverlaySettings(clock: false),
         defaultProfile: AspectProfile(imageMotion: false),
         nightMode: NightModeSettings(enabled: true, dimOpacity: 0.8),
       ),

@@ -525,7 +525,6 @@ class NightModeSettings {
     this.endMinutes = 420,
     this.dimOpacity = 0.8,
     this.pauseSlideshow = true,
-    this.hideOverlays = true,
   });
 
   final bool enabled;
@@ -533,7 +532,6 @@ class NightModeSettings {
   final int endMinutes;
   final double dimOpacity;
   final bool pauseSlideshow;
-  final bool hideOverlays;
 
   NightModeSettings copyWith({
     bool? enabled,
@@ -541,7 +539,6 @@ class NightModeSettings {
     int? endMinutes,
     double? dimOpacity,
     bool? pauseSlideshow,
-    bool? hideOverlays,
   }) {
     return NightModeSettings(
       enabled: enabled ?? this.enabled,
@@ -549,7 +546,6 @@ class NightModeSettings {
       endMinutes: endMinutes ?? this.endMinutes,
       dimOpacity: dimOpacity ?? this.dimOpacity,
       pauseSlideshow: pauseSlideshow ?? this.pauseSlideshow,
-      hideOverlays: hideOverlays ?? this.hideOverlays,
     );
   }
 
@@ -559,7 +555,6 @@ class NightModeSettings {
     'endMinutes': endMinutes,
     'dimOpacity': dimOpacity,
     'pauseSlideshow': pauseSlideshow,
-    'hideOverlays': hideOverlays,
   };
 
   factory NightModeSettings.fromJson(Map<String, dynamic> json) {
@@ -569,7 +564,6 @@ class NightModeSettings {
       endMinutes: _asInt(json['endMinutes'], 420, min: 0, max: 1439),
       dimOpacity: _asNullableDouble(json['dimOpacity'], min: 0, max: 1) ?? 0.8,
       pauseSlideshow: _asBool(json['pauseSlideshow'], true),
-      hideOverlays: _asBool(json['hideOverlays'], true),
     );
   }
 }
@@ -604,76 +598,6 @@ class CacheSettings {
         max: 1024 * 1024 * 1024 * 1024,
       ),
       prefetchCount: _asInt(json['prefetchCount'], 3, min: 0, max: 20),
-    );
-  }
-}
-
-class OverlaySettings {
-  const OverlaySettings({
-    this.clock = true,
-    this.weather = false,
-    this.metadata = false,
-    this.weatherLatitude,
-    this.weatherLongitude,
-    this.weatherLocationLabel = '',
-    this.weatherUnit = 'celsius',
-  });
-
-  final bool clock;
-  final bool weather;
-  final bool metadata;
-  final double? weatherLatitude;
-  final double? weatherLongitude;
-  final String weatherLocationLabel;
-  final String weatherUnit;
-
-  OverlaySettings copyWith({
-    bool? clock,
-    bool? weather,
-    bool? metadata,
-    double? weatherLatitude,
-    double? weatherLongitude,
-    String? weatherLocationLabel,
-    String? weatherUnit,
-  }) {
-    return OverlaySettings(
-      clock: clock ?? this.clock,
-      weather: weather ?? this.weather,
-      metadata: metadata ?? this.metadata,
-      weatherLatitude: weatherLatitude ?? this.weatherLatitude,
-      weatherLongitude: weatherLongitude ?? this.weatherLongitude,
-      weatherLocationLabel: weatherLocationLabel ?? this.weatherLocationLabel,
-      weatherUnit: weatherUnit ?? this.weatherUnit,
-    );
-  }
-
-  Map<String, dynamic> toJson() => <String, dynamic>{
-    'clock': clock,
-    'weather': weather,
-    'metadata': metadata,
-    'weatherLatitude': weatherLatitude,
-    'weatherLongitude': weatherLongitude,
-    'weatherLocationLabel': weatherLocationLabel,
-    'weatherUnit': weatherUnit,
-  };
-
-  factory OverlaySettings.fromJson(Map<String, dynamic> json) {
-    return OverlaySettings(
-      clock: _asBool(json['clock'], true),
-      weather: _asBool(json['weather'], false),
-      metadata: _asBool(json['metadata'], false),
-      weatherLatitude: _asNullableDouble(
-        json['weatherLatitude'],
-        min: -90,
-        max: 90,
-      ),
-      weatherLongitude: _asNullableDouble(
-        json['weatherLongitude'],
-        min: -180,
-        max: 180,
-      ),
-      weatherLocationLabel: _asString(json['weatherLocationLabel'], ''),
-      weatherUnit: _asString(json['weatherUnit'], 'celsius'),
     );
   }
 }
@@ -722,6 +646,48 @@ class AutomationSettings {
   }
 }
 
+class PluginSettings {
+  const PluginSettings({
+    this.gridSnap = false,
+    this.gridSize = 16,
+    this.seededExamplesVersion = 0,
+  });
+
+  final bool gridSnap;
+  final int gridSize;
+  final int seededExamplesVersion;
+
+  PluginSettings copyWith({
+    bool? gridSnap,
+    int? gridSize,
+    int? seededExamplesVersion,
+  }) {
+    return PluginSettings(
+      gridSnap: gridSnap ?? this.gridSnap,
+      gridSize: gridSize ?? this.gridSize,
+      seededExamplesVersion: seededExamplesVersion ?? this.seededExamplesVersion,
+    );
+  }
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'gridSnap': gridSnap,
+    'gridSize': gridSize,
+    'seededExamplesVersion': seededExamplesVersion,
+  };
+
+  factory PluginSettings.fromJson(Map<String, dynamic> json) {
+    return PluginSettings(
+      gridSnap: _asBool(json['gridSnap'], false),
+      gridSize: _asInt(json['gridSize'], 16, min: 4, max: 256),
+      seededExamplesVersion: _asInt(
+        json['seededExamplesVersion'],
+        0,
+        min: 0,
+      ),
+    );
+  }
+}
+
 /// Immutable tree of persisted application settings.
 class AppSettings {
   const AppSettings({
@@ -734,11 +700,11 @@ class AppSettings {
     this.display = const DisplaySettings(),
     this.nightMode = const NightModeSettings(),
     this.cache = const CacheSettings(),
-    this.overlays = const OverlaySettings(),
     this.automation = const AutomationSettings(),
+    this.plugins = const PluginSettings(),
   });
 
-  static const int currentSchemaVersion = 3;
+  static const int currentSchemaVersion = 4;
 
   final int schemaVersion;
   final ConnectionSettings connection;
@@ -749,8 +715,8 @@ class AppSettings {
   final DisplaySettings display;
   final NightModeSettings nightMode;
   final CacheSettings cache;
-  final OverlaySettings overlays;
   final AutomationSettings automation;
+  final PluginSettings plugins;
 
   AppSettings copyWith({
     int? schemaVersion,
@@ -762,8 +728,8 @@ class AppSettings {
     DisplaySettings? display,
     NightModeSettings? nightMode,
     CacheSettings? cache,
-    OverlaySettings? overlays,
     AutomationSettings? automation,
+    PluginSettings? plugins,
   }) {
     return AppSettings(
       schemaVersion: schemaVersion ?? this.schemaVersion,
@@ -775,8 +741,8 @@ class AppSettings {
       display: display ?? this.display,
       nightMode: nightMode ?? this.nightMode,
       cache: cache ?? this.cache,
-      overlays: overlays ?? this.overlays,
       automation: automation ?? this.automation,
+      plugins: plugins ?? this.plugins,
     );
   }
 
@@ -792,8 +758,8 @@ class AppSettings {
     'display': display.toJson(),
     'nightMode': nightMode.toJson(),
     'cache': cache.toJson(),
-    'overlays': overlays.toJson(),
     'automation': automation.toJson(),
+    'plugins': plugins.toJson(),
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -819,8 +785,8 @@ class AppSettings {
       display: DisplaySettings.fromJson(_jsonMap(json['display'])),
       nightMode: NightModeSettings.fromJson(_jsonMap(json['nightMode'])),
       cache: CacheSettings.fromJson(_jsonMap(json['cache'])),
-      overlays: OverlaySettings.fromJson(_jsonMap(json['overlays'])),
       automation: AutomationSettings.fromJson(_jsonMap(json['automation'])),
+      plugins: PluginSettings.fromJson(_jsonMap(json['plugins'])),
     );
   }
 }

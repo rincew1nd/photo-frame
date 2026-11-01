@@ -48,6 +48,7 @@ class FakeMediaPlayback implements MediaPlayback {
 
   @override
   Future<void> play() async {
+    _checkDisposed();
     playCalls++;
     playing = true;
     emit(const PlaybackSnapshot(phase: PlaybackPhase.playing));
@@ -55,6 +56,7 @@ class FakeMediaPlayback implements MediaPlayback {
 
   @override
   Future<void> pause() async {
+    _checkDisposed();
     pauseCalls++;
     playing = false;
     emit(const PlaybackSnapshot(phase: PlaybackPhase.paused));
@@ -72,6 +74,7 @@ class FakeMediaPlayback implements MediaPlayback {
 
   @override
   Future<void> seek(Duration position) async {
+    _checkDisposed();
     seekCalls++;
     lastSeek = position;
     this.position = position;
@@ -81,6 +84,12 @@ class FakeMediaPlayback implements MediaPlayback {
         position: position,
       ),
     );
+  }
+
+  void _checkDisposed() {
+    if (disposed) {
+      throw StateError('"[Player] has been disposed"');
+    }
   }
 
   void emit(PlaybackSnapshot snapshot) {

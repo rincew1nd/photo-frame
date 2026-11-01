@@ -40,7 +40,9 @@ installed plugin bundles, the local plugin server, the webview/CEF engine, and t
   certificate validation is not disabled.
 
 > Status: plugin-related items throughout this document describe the Phase 4 design target. Phase 4
-> is not started, so they are not implemented or verified.
+> is in progress: manifest/ZIP validation, DB v4, the store/seeder, loopback host, and webview
+> adapters exist; bridge/snapshot, UI, placement, and bundled examples are not implemented yet.
+> Android runtime validation is blocked by a MIUI USB-install restriction.
 
 ## 4. Plugin sandbox
 
@@ -110,8 +112,10 @@ reduce exposure; do not expose the server on non-loopback interfaces.
 ## 6. Plugin supply chain
 
 - V1 installs local ZIPs only; no marketplace or remote URL install.
+- Bundled example plugins are seeded from app assets at first run; they are first-party examples and
+  can be disabled or uninstalled like any plugin.
 - No signatures in v1. The user sees identity, author, version, description, icon, screenshots,
-  permissions, requested inputs, and license before activation.
+  permissions, requested inputs, and license before activation of a third-party ZIP.
 - SHA-256 is recorded for integrity/update comparison, not as a trust signature.
 - Updates require explicit confirmation when permissions or settings compatibility change.
 - A future version may add signatures and a curated catalog.

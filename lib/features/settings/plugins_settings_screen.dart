@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:photoframe/app/providers.dart';
+import 'package:photoframe/data/plugins/plugin_store.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
+import 'package:photoframe/features/settings/plugin_ui.dart';
 import 'package:photoframe/features/settings/settings_scaffold.dart';
 
 class PluginsSettingsScreen extends ConsumerWidget {
@@ -22,189 +25,153 @@ class PluginsSettingsScreen extends ConsumerWidget {
   }
 
   Widget _body(BuildContext context, WidgetRef ref, AppSettings settings) {
-    final overlays = settings.overlays;
-    final label = overlays.weatherLocationLabel.trim();
-    final latitude = overlays.weatherLatitude;
-    final longitude = overlays.weatherLongitude;
-    final unit = overlays.weatherUnit == 'fahrenheit'
-        ? 'fahrenheit'
-        : 'celsius';
-    return ListView(
+    return ListView(children: const <Widget>[_InstalledPluginsSection()]);
+  }
+}
+
+class _InstalledPluginsSection extends ConsumerWidget {
+  const _InstalledPluginsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final plugins = ref.watch(installedPluginsProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const SettingsSectionHeader('Built-in overlays'),
-        SwitchListTile(
-          title: const Text('Clock'),
-          value: overlays.clock,
-          onChanged: (value) =>
-              _save(ref, (overlay) => overlay.copyWith(clock: value)),
-        ),
-        SwitchListTile(
-          title: const Text('Weather'),
-          value: overlays.weather,
-          onChanged: (value) =>
-              _save(ref, (overlay) => overlay.copyWith(weather: value)),
-        ),
-        ListTile(
-          key: const ValueKey<String>('weather-location'),
-          title: const Text('Location'),
-          subtitle: Text(label.isEmpty ? 'Not set' : label),
-          onTap: () => _editLocation(context, ref, label),
-        ),
-        ListTile(
-          key: const ValueKey<String>('weather-latitude'),
-          title: const Text('Latitude'),
-          subtitle: Text(latitude == null ? 'Not set' : '$latitude'),
-          onTap: () => _editCoordinate(
-            context,
-            ref,
-            title: 'Weather latitude',
-            current: latitude,
-            min: -90,
-            max: 90,
-            save: (overlay, value) => overlay.copyWith(weatherLatitude: value),
-          ),
-        ),
-        ListTile(
-          key: const ValueKey<String>('weather-longitude'),
-          title: const Text('Longitude'),
-          subtitle: Text(longitude == null ? 'Not set' : '$longitude'),
-          onTap: () => _editCoordinate(
-            context,
-            ref,
-            title: 'Weather longitude',
-            current: longitude,
-            min: -180,
-            max: 180,
-            save: (overlay, value) => overlay.copyWith(weatherLongitude: value),
-          ),
-        ),
-        ListTile(
-          title: const Text('Unit'),
-          trailing: DropdownButton<String>(
-            value: unit,
-            onChanged: (value) {
-              if (value != null) {
-                _save(ref, (overlay) => overlay.copyWith(weatherUnit: value));
-              }
-            },
-            items: const <DropdownMenuItem<String>>[
-              DropdownMenuItem<String>(
-                value: 'celsius',
-                child: Text('Celsius'),
-              ),
-              DropdownMenuItem<String>(
-                value: 'fahrenheit',
-                child: Text('Fahrenheit'),
-              ),
-            ],
-          ),
-        ),
-        SwitchListTile(
-          title: const Text('Metadata'),
-          value: overlays.metadata,
-          onChanged: (value) =>
-              _save(ref, (overlay) => overlay.copyWith(metadata: value)),
-        ),
         const SettingsSectionHeader('Installed plugins'),
-        const ListTile(
-          leading: Icon(Icons.extension),
-          title: Text('No plugins installed'),
-          subtitle: Text('Plugin support arrives in Phase 4.'),
+        ...plugins.when(
+          loading: () => const <Widget>[
+            ListTile(title: Text('Loading plugins...')),
+          ],
+          error: (error, stackTrace) => <Widget>[
+            ListTile(
+              title: const Text('Unable to load plugins'),
+              subtitle: Text('$error'),
+              trailing: TextButton(
+                onPressed: () => ref.invalidate(installedPluginsProvider),
+                child: const Text('Retry'),
+              ),
+            ),
+          ],
+          data: (installed) => installed.isEmpty
+              ? const <Widget>[
+                  ListTile(
+                    leading: Icon(Icons.extension),
+                    title: Text('No plugins installed'),
+                    subtitle: Text('Add a plugin ZIP to get started.'),
+                  ),
+                ]
+              : <Widget>[
+                  for (final plugin in installed)
+                    _InstalledPluginTile(plugin: plugin),
+                ],
         ),
-        const ListTile(
-          enabled: false,
-          leading: Icon(Icons.upload_file),
-          title: Text('Add plugin'),
-          subtitle: Text("Plugin system isn't available yet."),
+        ListTile(
+          key: const ValueKey<String>('add-plugin'),
+          leading: const Icon(Icons.upload_file),
+          title: const Text('Add plugin'),
+          subtitle: const Text('Install from a ZIP file path.'),
+          onTap: () => _add(context, ref),
         ),
       ],
     );
   }
 
-  void _save(WidgetRef ref, OverlaySettings Function(OverlaySettings) update) {
-    ref
-        .read(settingsControllerProvider.notifier)
-        .save(
-          (current) => current.copyWith(overlays: update(current.overlays)),
-        );
-  }
-
-  Future<void> _editLocation(
-    BuildContext context,
-    WidgetRef ref,
-    String current,
-  ) async {
-    final text = await _promptText(
-      context,
-      title: 'Weather location',
-      initialValue: current,
-    );
-    if (text == null || !context.mounted) {
+  Future<void> _add(BuildContext context, WidgetRef ref) async {
+    final installed = await showPluginZipImportDialog(context);
+    if (installed == null || !context.mounted) {
       return;
     }
-    _save(ref, (overlay) => overlay.copyWith(weatherLocationLabel: text));
+    ref.invalidate(installedPluginsProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Installed ${installed.manifest.name}.')),
+    );
   }
+}
 
-  Future<void> _editCoordinate(
-    BuildContext context,
-    WidgetRef ref, {
-    required String title,
-    required double? current,
-    required double min,
-    required double max,
-    required OverlaySettings Function(OverlaySettings, double) save,
-  }) async {
-    final text = await _promptText(
-      context,
-      title: title,
-      initialValue: current == null ? '' : '$current',
-      keyboardType: const TextInputType.numberWithOptions(
-        signed: true,
-        decimal: true,
+class _InstalledPluginTile extends ConsumerWidget {
+  const _InstalledPluginTile({required this.plugin});
+
+  final InstalledPlugin plugin;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = plugin.manifest.name;
+    return ListTile(
+      leading: pluginIcon(plugin),
+      title: Text(name),
+      subtitle: Text(
+        '${plugin.version} · ${pluginSourceLabel(plugin.source)}'
+        '${plugin.enabled ? '' : ' · Disabled'}',
       ),
-    );
-    if (text == null || !context.mounted) {
-      return;
-    }
-    final value = double.tryParse(text.trim());
-    if (value == null || value < min || value > max) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Enter a value between $min and $max')),
-      );
-      return;
-    }
-    _save(ref, (overlay) => save(overlay, value));
-  }
-
-  Future<String?> _promptText(
-    BuildContext context, {
-    required String title,
-    required String initialValue,
-    TextInputType? keyboardType,
-  }) {
-    var value = initialValue;
-    return showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(title),
-        content: TextFormField(
-          initialValue: initialValue,
-          autofocus: true,
-          keyboardType: keyboardType,
-          onChanged: (text) => value = text,
-          onFieldSubmitted: (text) => Navigator.of(dialogContext).pop(text),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
+      onTap: () => context.push('/settings/plugins/${plugin.id}'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Switch(
+            value: plugin.enabled,
+            onChanged: (value) => _setEnabled(context, ref, value),
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(value),
-            child: const Text('Save'),
+          IconButton(
+            tooltip: 'Delete $name',
+            icon: const Icon(Icons.delete_outline),
+            onPressed: () => _delete(context, ref),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _setEnabled(
+    BuildContext context,
+    WidgetRef ref,
+    bool enabled,
+  ) async {
+    try {
+      await ref.read(pluginStoreProvider).setEnabled(plugin.id, enabled);
+      ref.invalidate(installedPluginsProvider);
+    } on Object catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update the plugin: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete plugin?'),
+        content: Text(
+          'Delete "${plugin.manifest.name}"? Its files, settings, and '
+          'stored data will be removed.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+    try {
+      await ref.read(pluginStoreProvider).delete(plugin.id);
+      ref.invalidate(installedPluginsProvider);
+    } on Object catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not delete the plugin: $error')),
+        );
+      }
+    }
   }
 }

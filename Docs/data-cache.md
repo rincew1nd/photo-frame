@@ -157,7 +157,7 @@ Concurrency is bounded (downloads and decodes). The current slide is never evict
 - Media Filters & Aspect: Default profile and five buckets (fit, Live Photo mode, pan strength).
 - Display: keep screen on, night mode window/brightness, theme, image motion.
 - Plugins: plugin list, per-plugin settings screens, permissions, placement editor, grid snap/size.
-  Clock, weather, and metadata are bundled plugins, not separate built-in controls.
+  Clock, weather, and metadata are bundled example plugins, not separate built-in controls.
 - Automation: start on boot, launcher mode (Android), kiosk/fullscreen (desktop), update checks.
 - Media Cache: quota, prefetch count, sync now, cache statistics.
 - Connection & Security: server, API key/auth, permissions, biometric gating, logout.

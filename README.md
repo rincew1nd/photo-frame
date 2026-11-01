@@ -57,8 +57,10 @@ Not implemented yet:
 - **Phase 3 (remaining):** HDR-to-SDR verification and tuning, native library builds for Linux and
   Android (scripts exist but are unverified), and broader platform runtime testing. Video playback,
   Live Photo motion, and Windows native still decoding are implemented.
-- **Phase 4:** plugin host, WebView baseline checks, HTML/CSS/JS overlays, and migration of the
-  current clock/weather/metadata overlays into bundled plugins.
+- **Phase 4 implemented:** manifest/ZIP validation, plugin store/DB v4, loopback host, CEF/Android
+  webview adapters, snapshot/bridge/session, plugin management UI, slideshow drag/resize/grid
+  placement, and bundled example plugins. Windows and Android runtime
+  were verified; the 72-hour video/frame-drop soak remains a Phase 6 release gate.
 - **Phase 5:** update-check UI and APK download/install (blocked on a release channel and keystore),
   full kiosk lockdown (close/alt-tab suppression and multi-monitor selection), Linux AppImage/deb
   and runtime validation, and localization completion. Audio focus is implemented and unit/widget\n  tested; Android device verification is pending.
@@ -263,6 +265,7 @@ built.
 - [Documentation index](Docs/README.md)
 - [Product requirements](REQUIREMENTS.md)
 - [Phase plans](Plans/README.md)
+- [Plugin author guide](Docs/plugin-author-guide.md)
 - [Architecture](Docs/architecture.md)
 - [Platform support](Docs/platforms.md)
 - [Platform checklists](Docs/platform-checklists.md)

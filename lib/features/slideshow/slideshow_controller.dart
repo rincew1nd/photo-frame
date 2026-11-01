@@ -121,7 +121,6 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
   bool _userPaused = false;
   bool _weatherFetching = false;
   bool _syncing = false;
-  DateTime? _lastWeatherCheck;
   final Set<String> _derivedAttempts = <String>{};
   String? _derivingAssetId;
 
@@ -226,7 +225,7 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
         engine: engine,
         cached: cached,
         nightMode: night,
-        weather: _weatherConfigured(settings) ? previousWeather : null,
+        weather: previousWeather,
         error: assets.isEmpty ? _emptyError(settings, cached) : null,
       ),
     );
@@ -489,15 +488,15 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
     _publishEngine(engine);
   }
 
-  Future<WeatherSnapshot?> refreshWeather() async {
+  /// Fetches weather for a plugin that declares the weather input.
+  Future<WeatherSnapshot?> refreshWeatherAt({
+    required double latitude,
+    required double longitude,
+    required String unit,
+    required String locationLabel,
+  }) async {
     if (_weatherFetching) {
       return state.value?.weather;
-    }
-    final overlays = _settings.overlays;
-    final latitude = overlays.weatherLatitude;
-    final longitude = overlays.weatherLongitude;
-    if (!overlays.weather || latitude == null || longitude == null) {
-      return null;
     }
     _weatherFetching = true;
     try {
@@ -506,8 +505,8 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
           .current(
             latitude: latitude,
             longitude: longitude,
-            unit: overlays.weatherUnit,
-            locationLabel: overlays.weatherLocationLabel,
+            unit: unit,
+            locationLabel: locationLabel,
           );
       if (snapshot != null && ref.mounted) {
         final current = state.value;
@@ -549,16 +548,6 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
       engine.tick(const Duration(seconds: 1));
     }
     _syncEngineDuration(engine);
-
-    final now = DateTime.now();
-    if (_weatherConfigured(_settings) &&
-        !_weatherFetching &&
-        (_lastWeatherCheck == null ||
-            now.difference(_lastWeatherCheck!) >=
-                const Duration(seconds: 30))) {
-      _lastWeatherCheck = now;
-      unawaited(refreshWeather());
-    }
 
     state = AsyncData(
       _viewState(
@@ -674,12 +663,6 @@ class SlideshowController extends AsyncNotifier<SlideshowViewState> {
       now: DateTime.now(),
       enabled: settings.nightMode.enabled,
     );
-  }
-
-  bool _weatherConfigured(AppSettings settings) {
-    return settings.overlays.weather &&
-        settings.overlays.weatherLatitude != null &&
-        settings.overlays.weatherLongitude != null;
   }
 
   String _emptyError(AppSettings settings, List<CachedAsset> cached) {

@@ -80,7 +80,7 @@ implemented or verified.
 | Signatures/checksums required | No signatures in v1; explicit install + permission consent; record SHA-256 |
 | Plugins outside the slideshow | Slideshow only in v1 |
 | Bundle/memory/CPU/instance limits | 20 MB ZIP, 100 MB extracted, 500 files, 20 installed, 10 active, API v1 (see `plugins.md`) |
-| Replace built-in overlays with plugins | All overlays are bundled plugins; clock/weather/metadata are enabled by default and migrated from the compiled overlay settings |
+| Replace built-in overlays with plugins | All overlays are bundled example plugins; clock/weather/metadata start enabled and can be disabled or deleted like any plugin; compiled overlays are removed |
 | Plugin format | Sandboxed HTML/CSS/JS in the plugin webview; Dart is not loaded at runtime |
 | Plugin placement | Drag-and-drop and resize with optional grid snap/grid size in the Plugins screen |
 | Plugin settings | Each installed plugin has its own schema-rendered settings screen |
@@ -137,7 +137,8 @@ implemented or verified.
 - Settings groups and summaries follow SET-01..SET-09.
 - Per-aspect profiles and filters live in the designated group.
 - Plugin management, per-plugin settings, permissions, icons/screenshots, and placement live in the
-  Plugins group. Clock, weather, and metadata are managed there as bundled plugins.
+  Plugins group. Clock, weather, and metadata are managed there as bundled example plugins with no
+  special status.
 - Settings changes apply without restart.
 - Onboarding tour targets survive the new groups.
 - Search (SET-08) remains MAY; not required for v1.

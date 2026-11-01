@@ -1,15 +1,16 @@
 # Plugin System
 
-Status: Draft v0.3 (design target; Phase 4 not started)
+Status: Draft v0.4 (design target; Phase 4 in progress)
 Related: [`architecture.md`](architecture.md), [`security.md`](security.md),
 [`requirements-alignment.md`](requirements-alignment.md)
 
-> Implementation status (2026-11-01): this document is the Phase 4 design target, not current
-> behavior. The app currently ships clock/weather/metadata overlays as compiled Flutter widgets and a
-> placeholder Plugins settings screen; the target is for all three to become bundled plugins. No
-> plugin code, webview dependency, registry, host, bridge, or reference plugin exists. Phase 0's
-> transparent-overlay gate is unresolved: `webview_cef` 0.6.2 has no transparency API, and the
-> available Android WebView is below the Chromium 100+ baseline.
+> Implementation status (2026-11-01): Phase 4 is implemented: manifest/ZIP validation, DB v4, the
+> plugin store/seeder, loopback host, webview adapters, snapshot/bridge/session, management UI,
+> slideshow placement with drag/resize/grid, and bundled examples. Clock, weather, and metadata are
+> bundled example plugins enabled by default; no compiled overlay remains. Windows CEF and Android
+> WebView 156 runtime paths were verified; the
+> Windows implementation uses the software pixel-buffer path because the GPU shared-texture path
+> failed Flutter external-texture creation. The 72-hour video/frame-drop soak remains a Phase 6 gate.
 
 ## 1. Model
 
@@ -26,8 +27,9 @@ Plugins render as transparent, interactive overlays above the current photo/vide
 app controls and dialogs. They receive a read-only application state snapshot and may expose
 settings, invoke approved actions, request network access, and request placement changes.
 
-Every overlay is a plugin in v1, including clock, weather, and metadata. Those three are bundled
-with the app and enabled by default; no compiled-in overlay remains after migration.
+Every overlay is a plugin in v1, including clock, weather, and metadata. Those three ship as bundled
+example plugins and are enabled by default; no compiled-in overlay remains. They are not privileged:
+the user can disable or uninstall/delete them like any third-party plugin.
 
 Plugins never receive the Immich API key, server URL, credentials, album lists, or arbitrary app
 storage. Plugins never call Immich directly.
@@ -152,7 +154,7 @@ Example `plugin.json`:
 | `icon` | no | Relative image path shown in the plugin list and install/details UI |
 | `screenshots` | no | Relative image paths shown in the install/details UI |
 | `permissions` | yes | Capability declarations (currently `network`) |
-| `inputs` | no | Snapshot sections the plugin needs: `app`, `time`, `weather`, `playback`, `image`, `config`, `placement`; app/time are always sent |
+| `inputs` | no | Snapshot sections the plugin needs: `app`, `time`, `weather`, `playback`, `media`, `image`, `config`, `placement`; app/time are always sent |
 | `actions` | no | App actions the plugin may request |
 | `updateTriggers` | no | Declared event needs; the host still pushes required minimums |
 | `placement` | no | Default position, size, z-order, night-mode visibility |
@@ -208,7 +210,9 @@ placement editor.
 8. Register the plugin and apply the default placement.
 9. Start the overlay if the slideshow is visible.
 
-No plugin is installed silently. A failed validation leaves no partial installation.
+No plugin is installed silently. The only exception is the bundled example set, which is seeded on
+first run through the same registry/validation path; this is not a remote or third-party install.
+A failed validation leaves no partial installation.
 
 ### Update
 
@@ -226,11 +230,13 @@ No plugin is installed silently. A failed validation leaves no partial installat
 - Files, configuration, and storage remain.
 - Enabling recreates the overlay and restores placement/configuration.
 
-### Uninstall
+### Uninstall/delete
 
 - Remove the overlay and webview.
 - Remove the bundle, configuration, placement, and plugin-scoped storage.
 - Remove the registry entry.
+- Bundled example plugins use the same path; deleting one is permanent and is not undone
+  automatically.
 - Log the action without exposing secrets.
 
 ### Inspect
@@ -314,9 +320,13 @@ its dedicated settings screen, which shows:
   - current time/date;
   - weather (or null), fetched when the plugin declares `weather`;
   - playback state, index, total, interval, elapsed progress, mute, slideshow running;
+  - background media (`media`) when declared: `hasSession`, `title`, `artist`, `album`,
+    `packageName`, `playing`, `canPrevious`, `canNext`, `positionSeconds`, `durationSeconds`;
   - current image metadata (ID, type, Live Photo, dimensions, aspect bucket, MIME, cached/offline,
     EXIF date, description, location, tags);
   - plugin configuration and placement.
+- `media` is the active platform media session (for example Spotify or YouTube Music), not the
+  slideshow. When nothing is playing, `media` is `null`; check `hasSession` before using fields.
 - Calendar data: current date/time is always available. Event feeds are plugin-fetched and out of
   scope for app-provided data.
 - Minimum cadence: at most 1 Hz time tick while the slideshow is visible.
@@ -374,12 +384,24 @@ Supported actions:
 - `mute`
 - `unmute`
 - `toggleMute`
+- `mediaNext`
+- `mediaPrevious`
+- `mediaPlayPause`
 - `openSettings`
 - `openMediaSelection`
+
+`next`, `previous`, and `togglePause` control the slideshow. `mediaNext`, `mediaPrevious`, and
+`mediaPlayPause` control the background media session instead; they do nothing when no session
+exists.
 
 Actions must be declared in the manifest and granted by the user. They are rate-limited and only
 run while the slideshow is visible and the plugin is enabled. They cannot modify server
 configuration, credentials, permissions, or plugin configuration.
+
+On Android, reading or controlling the background media session requires Notification access.
+Users grant it from **Settings → Plugins → the plugin that declares the `media` input →
+Background media → Notification access**. Without access, `media` is null and media actions have no
+effect.
 
 ## 8. Network
 
@@ -457,11 +479,12 @@ See [`security.md`](security.md) for the full threat model.
 - Breaking bridge/snapshot changes increment the API version and require a compatibility note.
 - The app rejects plugins whose API version is unsupported.
 - Manifest schema changes are versioned.
-- Reference plugins are updated with the API.
+- Bundled example plugins are updated with the API.
 
-## 14. Reference plugins
+## 14. Bundled example plugins
 
-Bundled with the app:
+Bundled with the app as examples, using the same ZIP, manifest, registry, settings, and host path as
+a plugin from any other developer:
 
 - clock/time — enabled by default;
 - weather — enabled by default, owns the location/unit/label settings;
@@ -473,14 +496,16 @@ Bundled with the app:
 They:
 
 - use no network unless required;
-- demonstrate time ticks, image-change updates, weather data, playback data, image metadata, and
-  JSON settings;
+- demonstrate time ticks, image-change updates, weather data, playback/background media data,
+  image metadata, and JSON settings;
 - include icons, descriptions, and screenshots;
-- replace the compiled clock/weather/metadata overlays. Migration maps the old `OverlaySettings`
-  enabled state and weather coordinates/unit/label into the bundled plugin configuration.
+- share three style settings applied to `.card`: `backgroundColor` (`#000000`),
+  `backgroundOpacity` (`0.8`), and `cornerRadius` (`2em`);
+- replace the former compiled clock/weather/metadata overlays, which have been removed.
 
-No compiled-in clock, weather, or metadata overlay remains in v1. On devices below the WebView
-baseline, the slideshow runs without overlays.
+After seeding they have no special status. The user can disable or uninstall/delete any of them, and
+deletion is not undone automatically. No compiled-in clock, weather, or metadata overlay remains in
+v1. On devices below the WebView baseline, the slideshow runs without overlays.
 
 ## 15. V1 exclusions
 
@@ -501,7 +526,6 @@ baseline, the slideshow runs without overlays.
   screenshots/icons, invalid declared inputs.
 - Install/update/enable/disable/uninstall and storage cleanup.
 - Per-plugin settings screen rendering/validation and the plugin list icon/state.
-- Built-in overlay migration: enabled state and weather settings survive upgrade.
 - Sandbox: no host access, no direct network, no cross-plugin storage.
 - Network proxy: permission/revocation, timeouts, rate limits.
 - Placement: drag, resize, grid snap/grid size, clamping, safe areas, persistence, z-order.

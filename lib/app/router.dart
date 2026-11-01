@@ -7,6 +7,7 @@ import 'package:photoframe/features/settings/cache_settings_screen.dart';
 import 'package:photoframe/features/settings/connection_settings_screen.dart';
 import 'package:photoframe/features/settings/customizations_screen.dart';
 import 'package:photoframe/features/settings/playback_settings_screen.dart';
+import 'package:photoframe/features/settings/plugin_settings_screen.dart';
 import 'package:photoframe/features/settings/plugins_settings_screen.dart';
 import 'package:photoframe/features/settings/settings_shell.dart';
 import 'package:photoframe/features/settings/slideshow_settings_screen.dart';
@@ -67,6 +68,14 @@ GoRouter createAppRouter({required String initialLocation}) {
           GoRoute(
             path: 'plugins',
             builder: (context, state) => const PluginsSettingsScreen(),
+            routes: <RouteBase>[
+              GoRoute(
+                path: ':id',
+                builder: (context, state) => PluginSettingsScreen(
+                  pluginId: state.pathParameters['id']!,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             path: 'automation',

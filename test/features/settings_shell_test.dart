@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:photoframe/app/providers.dart';
 import 'package:photoframe/core/logging/app_logger.dart';
 import 'package:photoframe/data/cache/cache_store.dart';
+import 'package:photoframe/data/plugins/plugin_store.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/data/settings/settings_repository.dart';
 import 'package:photoframe/features/settings/settings_shell.dart';
@@ -50,6 +51,9 @@ Widget _app(InMemorySettingsRepository repository, GoRouter router) {
       settingsRepositoryProvider.overrideWithValue(repository),
       cacheStoreProvider.overrideWithValue(MemoryCacheStore()),
       appLoggerProvider.overrideWithValue(AppLogger()),
+      installedPluginsProvider.overrideWith(
+        (ref) async => <InstalledPlugin>[],
+      ),
     ],
     child: MaterialApp.router(
       routerConfig: router,
@@ -131,7 +135,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Cover · Ambient glow · Pan 30'), findsOneWidget);
-    expect(find.text('1 built-in overlay · 0 plugins'), findsOneWidget);
+    expect(find.text('0 plugins · 0 enabled'), findsOneWidget);
     expect(
       find.text('Fullscreen · Keep awake · Night mode on'),
       findsOneWidget,

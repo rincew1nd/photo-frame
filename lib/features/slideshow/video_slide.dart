@@ -53,6 +53,7 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
   bool _preloaded = false;
   bool _reverse = false;
   bool _bouncing = false;
+  bool _restartingLoop = false;
   late final AudioFocusService _audioFocus;
   StreamSubscription<AudioFocusEvent>? _focusSubscription;
   bool _hasFocus = false;
@@ -170,6 +171,38 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     }
   }
 
+  bool _canUse(MediaPlayback playback) =>
+      mounted && identical(_playback, playback);
+
+  Future<bool> _guarded(
+    MediaPlayback playback,
+    Future<void> Function() action,
+  ) async {
+    if (!_canUse(playback)) {
+      return false;
+    }
+    try {
+      await action();
+    } on Object {
+      return false;
+    }
+    return _canUse(playback);
+  }
+
+  Future<void> _restartLoop(MediaPlayback playback) async {
+    try {
+      if (!await _guarded(playback, () => playback.seek(Duration.zero))) {
+        return;
+      }
+      if (!widget.playing) {
+        return;
+      }
+      await _guarded(playback, playback.play);
+    } finally {
+      _restartingLoop = false;
+    }
+  }
+
   void _onSnapshot(PlaybackSnapshot snapshot) {
     if (!mounted) {
       return;
@@ -189,9 +222,9 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
         unawaited(_bounce());
       } else if (widget.loop) {
         final playback = _playback;
-        if (playback != null) {
-          unawaited(playback.seek(Duration.zero));
-          unawaited(playback.play());
+        if (playback != null && !_restartingLoop) {
+          _restartingLoop = true;
+          unawaited(_restartLoop(playback));
         }
       } else {
         widget.onCompleted?.call();
@@ -244,44 +277,71 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
 
   /// Seeks backward in short steps on completion, then plays forward again.
   Future<void> _bounce() async {
-    if (_bouncing) {
+    final playback = _playback;
+    if (playback == null || _bouncing) {
       return;
     }
     _bouncing = true;
+    _reverse = true;
     try {
-      final playback = _playback;
-      if (playback == null) {
-        return;
-      }
       final duration = _snapshot.duration;
       if (duration == null || duration <= Duration.zero) {
         _reverse = false;
-        await playback.seek(Duration.zero);
+        if (!await _guarded(playback, () => playback.seek(Duration.zero))) {
+          return;
+        }
         if (widget.playing) {
-          await playback.play();
+          await _guarded(playback, playback.play);
         }
         return;
       }
-      _reverse = true;
-      await playback.pause();
+      if (!await _guarded(playback, playback.pause)) {
+        return;
+      }
+      if (!_reverse) {
+        return;
+      }
       await Future<void>.delayed(const Duration(milliseconds: 100));
-      final target = duration - const Duration(milliseconds: 300);
-      await playback.seek(target < Duration.zero ? Duration.zero : target);
-      var reversePosition = target;
-      while (mounted && _reverse && reversePosition > Duration.zero) {
+      if (!_canUse(playback) || !_reverse) {
+        return;
+      }
+      var reversePosition = duration - const Duration(milliseconds: 300);
+      if (reversePosition < Duration.zero) {
+        reversePosition = Duration.zero;
+      }
+      if (!await _guarded(
+        playback,
+        () => playback.seek(reversePosition),
+      )) {
+        return;
+      }
+      while (_canUse(playback) && _reverse && reversePosition > Duration.zero) {
         if (!widget.playing) {
           await Future<void>.delayed(const Duration(milliseconds: 50));
           continue;
         }
         reversePosition -= const Duration(milliseconds: 100);
         if (reversePosition < Duration.zero) reversePosition = Duration.zero;
-        await playback.seek(reversePosition);
+        if (!await _guarded(
+          playback,
+          () => playback.seek(reversePosition),
+        )) {
+          return;
+        }
         await Future<void>.delayed(const Duration(milliseconds: 100));
+        if (!_canUse(playback) || !_reverse) {
+          return;
+        }
+      }
+      if (!_canUse(playback)) {
+        return;
       }
       _reverse = false;
-      await playback.seek(Duration.zero);
+      if (!await _guarded(playback, () => playback.seek(Duration.zero))) {
+        return;
+      }
       if (widget.playing) {
-        await playback.play();
+        await _guarded(playback, playback.play);
       }
     } finally {
       _bouncing = false;
@@ -332,6 +392,7 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     _focusSubscription = null;
     _playback = null;
     _reverse = false;
+    _restartingLoop = false;
     if (subscription != null) {
       unawaited(subscription.cancel());
     }

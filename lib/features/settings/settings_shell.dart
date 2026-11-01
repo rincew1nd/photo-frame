@@ -58,12 +58,9 @@ class SettingsShell extends ConsumerWidget {
             profile.panStrength > 0
         ? ' · Pan ${profile.panStrength}'
         : '';
-    final overlays = settings.overlays;
-    final overlayCount = <bool>[
-      overlays.clock,
-      overlays.weather,
-      overlays.metadata,
-    ].where((enabled) => enabled).length;
+    final plugins = ref.watch(installedPluginsProvider).value ?? const [];
+    final pluginCount = plugins.length;
+    final enabledPluginCount = plugins.where((plugin) => plugin.enabled).length;
     final automation = settings.automation;
     final night = settings.nightMode;
     final mediaCount = settings.filters.selectedAssetIds.length;
@@ -110,9 +107,7 @@ class SettingsShell extends ConsumerWidget {
         const SettingsSectionHeader('Plugins'),
         _row(
           title: 'Plugins',
-          subtitle:
-              '$overlayCount built-in '
-              '${overlayCount == 1 ? 'overlay' : 'overlays'} · 0 plugins',
+          subtitle: '$pluginCount plugins · $enabledPluginCount enabled',
           onTap: () => context.push('/settings/plugins'),
         ),
         const SettingsSectionHeader('Automation'),

@@ -110,7 +110,7 @@ Copyright licenses do not grant patent licenses for codecs.
 ## 8. Plugins
 
 - Every plugin manifest declares a `license` field.
-- Bundled reference plugins are MIT, matching the app.
+- Bundled example plugins are MIT, matching the app.
 - User-installed plugins remain the responsibility of their authors; the app displays the declared
   license and installs only local ZIPs with explicit consent.
 - No plugin may bundle GPL/native code through the plugin format (native binaries are rejected).

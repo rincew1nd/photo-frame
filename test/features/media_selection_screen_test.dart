@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 import 'package:photoframe/app/providers.dart';
 import 'package:photoframe/data/cache/cache_assets.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
-import 'package:photoframe/data/weather/weather_service.dart';
 import 'package:photoframe/features/media_selection/media_selection_screen.dart';
 import 'package:photoframe/features/slideshow/slideshow_controller.dart';
 import 'package:photoframe/platform/services.dart';
@@ -38,9 +37,6 @@ class _FakeSlideshowController extends SlideshowController {
 
   @override
   Future<SlideshowViewState> build() async => initial;
-
-  @override
-  Future<WeatherSnapshot?> refreshWeather() async => null;
 }
 
 class _NoBiometrics implements BiometricsService {

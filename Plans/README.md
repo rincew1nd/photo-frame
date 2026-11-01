@@ -17,7 +17,7 @@ and Android as applicable.
 | 1 | [Foundation](phase-1-foundation.md) | App scaffold, Immich connection/auth, settings, storage, CI | Connect and persist a working session |
 | 2 | [Photos and cache](phase-2-photos-cache.md) | Photo slideshow, cache/offline, filters, profiles, settings UI | Play cached photos offline with filters/profiles |
 | 3 | [Media](phase-3-media.md) | Video, audio, Live Photos, HEIC/AVIF, DNG/ProRAW, tone-mapping | Original media plays with correct controls/audio |
-| 4 | [Plugins](phase-4-plugins.md) | ZIP install, sandbox, host bridge, placement, actions, reference plugins | Interactive sandboxed plugin above video |
+| 4 | [Plugins](phase-4-plugins.md) | ZIP install, sandbox, host bridge, placement, actions, bundled example plugins | Interactive sandboxed plugin above video |
 | 5 | [Platform integration](phase-5-platform.md) | Boot/launcher, kiosk, sleep, biometrics, updates, diagnostics | Unattended frame behaviour on all targets |
 | 6 | [Hardening and release](phase-6-hardening-release.md) | Soak, security, performance, docs, signed release | Release checklist complete |
 
@@ -77,7 +77,7 @@ Phase 0 is `Done (conditional go)`; see `Docs/spike-0-results.md`. Phases 1–2 
 (automated/API verification; platform-runtime verification partial)`; see
 [`../Docs/phase-1-2-verification.md`](../Docs/phase-1-2-verification.md). Phase 3 is implemented with
 verification gaps: HDR tuning, Linux/Android native library builds, and broader runtime testing.
-Phase 4 is not started. Phase 5 is in progress: Android boot/HOME/security plumbing, night
+Phase 4 is in progress: the Windows overlay gate passed, M1 package/persistence is complete, and M2's loopback host plus webview adapters are built; Android runtime validation is blocked by a MIUI USB-install restriction. Phase 5 is in progress: Android boot/HOME/security plumbing, night
 brightness, diagnostics, desktop automation, single-instance focus, and packaging scripts are
 implemented.
 Updates, full kiosk lockdown, Linux runtime validation, localization, and audio focus remain. There

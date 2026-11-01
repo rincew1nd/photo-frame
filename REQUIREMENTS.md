@@ -54,7 +54,7 @@ These capabilities already exist and must not regress.
 | BR-05 | Cache media for offline playback, prefetch the next slide, and continue the slideshow when the server is unreachable. | MUST |
 | BR-06 | Provide in-slideshow controls: previous, next, pause/resume, mute/unmute, album selection, media selection, and settings. | MUST |
 | BR-07 | Protect media/library navigation and API-key reveal/copy with biometric or device-credential authentication where a screen lock exists; fail open for navigation on devices without a lock. | MUST |
-| BR-08 | Provide clock, current weather, and photo metadata overlays as bundled plugins, each independently enabled and configurable. | MUST |
+| BR-08 | Provide clock, current weather, and photo metadata overlays as bundled example plugins, each independently enabled, configurable, and removable. | MUST |
 | BR-09 | Support night mode: dim to a configured brightness during a scheduled window, including overnight windows. | MUST |
 | BR-10 | Support start-on-boot, launcher mode (home replacement), and in-app update checks from GitHub releases. | MUST |
 | BR-11 | Persist all user settings across restarts and apply changes without reinstalling. | MUST |
@@ -129,19 +129,16 @@ These capabilities already exist and must not regress.
 
 ### 3.0 Implementation status (2026-11-01)
 
-Phase 4 is not started and is blocked on the Phase 0 transparent-overlay/WebView gate. The app
-currently ships clock, weather, and metadata overlays as compiled Flutter widgets and a Plugins
-settings placeholder; that implementation is the migration source, not the v1 target. The target is
-for every overlay — including clock, weather, and metadata — to be a plugin rendered by the host,
-with its own settings screen and draggable/resizable placement. There is no plugin bundle, manifest
-validation, registry, install/update UI, host page, bridge, sandbox, placement editor, plugin
-storage, or reference plugin yet. Settings and the cache database are schema v3 with no plugin state,
-and `Plugin API v1` is only advertised in diagnostics.
+Phase 4 is implemented: manifest/ZIP validation, DB v4, the plugin store/seeder, loopback host,
+webview adapters, snapshot/bridge/session, plugin management UI, slideshow placement with
+drag/resize/grid, and bundled example plugins. Every overlay — including clock, weather, and
+metadata — is a plugin rendered by the host, with its own settings screen and draggable/resizable
+placement. The compiled Flutter overlays and their legacy `OverlaySettings` configuration have been
+removed; plugins are the only overlay system.
 
-Two snapshot gaps must be resolved in Phase 4: weather is fetched only when the current compiled
-weather overlay is enabled, and the cached `tags` field is always empty because sync never populates
-it. The current `OverlaySettings` switches and weather coordinates must migrate into the bundled
-weather plugin's configuration when the compiled overlays are removed.
+The cached `tags` field is always empty because sync never populates it; tag support requires a sync
+change or an explicit requirement amendment. Weather for plugins is fetched through
+`SlideshowController.refreshWeatherAt()` using the weather plugin's own settings.
 
 ### 3.1 Model and package format
 
@@ -151,7 +148,7 @@ weather plugin's configuration when the compiled overlays are removed.
 | PLG-02 | A plugin is a self-contained bundle containing a JSON manifest, an HTML document, a CSS stylesheet, optional sandboxed script, optional local assets, optional screenshots, and an optional icon. | MUST |
 | PLG-03 | The manifest declares at minimum: plugin ID, name, version, author, homepage/site, description, app/API compatibility, requested permissions, requested snapshot inputs, JSON settings schema, update triggers, optional actions, optional icon, and default placement. | MUST |
 | PLG-04 | The manifest, settings schema, inputs, icon, and screenshots are validated on install. Invalid, incompatible, or duplicate-ID plugins are rejected with a readable error. | MUST |
-| PLG-05 | Plugins are installed explicitly by the user. Installing a plugin must show its identity, version, icon, requested permissions, and requested inputs before activation. | MUST |
+| PLG-05 | Plugins from a local ZIP are installed explicitly by the user. Installing a plugin must show its identity, version, icon, requested permissions, and requested inputs before activation. Bundled example plugins are the only exception: they are seeded on first run without a ZIP picker. | MUST |
 
 ### 3.2 Lifecycle management
 
@@ -184,7 +181,7 @@ the photo library, the API key, the server URL, or credentials.
 |---|---|---|
 | PLG-18 | **App data**: app version, plugin API version, locale, time zone, theme, viewport size, safe-area insets, night-mode state. | MUST |
 | PLG-19 | **Time data**: current epoch time, local time, date, time zone, and locale. | MUST |
-| PLG-20 | **Weather data**: current temperature, unit, weather code/description, and location label when a plugin declares the weather input and weather is available; otherwise null. Weather is fetched by the host from the bundled weather plugin's location/unit settings, not only when a compiled-in overlay is enabled. | MUST |
+| PLG-20 | **Weather data**: current temperature, unit, weather code/description, and location label when a plugin declares the weather input and weather is available; otherwise null. Weather is fetched by the host from the bundled weather plugin's location/unit settings. | MUST |
 | PLG-21 | **Playback data**: playing/paused state, current index, total count, interval, elapsed progress, muted state, and slideshow-running state. | MUST |
 | PLG-22 | **Image data**: current asset ID, media type, Live Photo flag, dimensions, aspect bucket, MIME type, cached/offline state, EXIF date, description, location, and tags. | MUST |
 | PLG-23 | **Calendar data**: current date/time is always available; calendar events are optional. A calendar plugin may fetch an external ICS/CalDAV feed only with the Network permission. App-provided event feeds are out of scope for v1. | SHOULD |
@@ -220,14 +217,14 @@ the photo library, the API key, the server URL, or credentials.
 | PLG-38 | Changing a plugin setting triggers an immediate plugin update without restarting the slideshow. | MUST |
 | PLG-39 | Plugin UI labels may be supplied by the plugin; app-owned labels and settings chrome must be localized. | MUST |
 
-### 3.8 Reference plugins
+### 3.8 Bundled example plugins
 
 | ID | Requirement | Priority |
 |---|---|---|
-| PLG-40 | Ship reference plugins for clock/time, calendar/date, weather, playback status, and current image information. | SHOULD |
-| PLG-41 | Bundled reference plugins are present without a manual install. Clock, weather, and metadata are enabled by default; other reference plugins are disabled by default. None request network permission unless needed. | MUST |
-| PLG-42 | Reference plugins demonstrate time ticks, image-change updates, weather data, playback data, image metadata, icons, screenshots, and JSON settings. | SHOULD |
-| PLG-43 | Clock, weather, and photo-metadata overlays are bundled plugins, not compiled-in Flutter widgets. Fresh installs enable them by default; upgrades migrate the existing `OverlaySettings` enabled state and weather coordinates/unit/label into the weather plugin. No compiled-in overlay remains in v1. | MUST |
+| PLG-40 | Ship bundled example plugins for clock/time, calendar/date, weather, playback status, and current image information. | SHOULD |
+| PLG-41 | Bundled examples are seeded on first run and use the same ZIP validation, manifest, registry, settings, and host path as a plugin from any other developer. Clock/weather/metadata start enabled; other examples start disabled. After seeding they have no special status: the user can disable or uninstall/delete any of them, and deletion is not undone automatically. None request network permission unless needed. | MUST |
+| PLG-42 | Bundled examples demonstrate time ticks, image-change updates, weather data, playback data, image metadata, icons, screenshots, and JSON settings. | SHOULD |
+| PLG-43 | Clock, weather, and photo-metadata overlays are bundled example plugins, not compiled-in Flutter widgets. Fresh installs enable them by default. Once seeded, they are ordinary removable plugins, and no compiled-in overlay remains in v1. | MUST |
 
 ### 3.9 Security, privacy, and reliability
 
@@ -308,7 +305,7 @@ the photo library, the API key, the server URL, or credentials.
 12. **Settings groups**: All groups collapse and expand; the tour can open the group containing its target; the settings screen does not duplicate media filter or profile controls.
 13. **Persistence**: Filters, profiles, plugin configuration, and placement survive app restart.
 14. **Permission degradation**: With `asset.download` denied, Videos is locked off and the slideshow continues with photos and Live Photos.
-15. **All overlays as plugins**: Clock, weather, and metadata are bundled plugins. Fresh installs enable them by default; upgrading from the compiled overlays preserves each enabled state and the weather location/unit/label.
+15. **All overlays as plugins**: Clock, weather, and metadata are bundled example plugins and the only overlay system; compiled overlays have been removed. Fresh installs enable them by default. Disable and delete each through the normal plugin controls; they do not return automatically.
 16. **Per-plugin settings**: Open Plugins → Clock → settings, change the time format, and see the clock overlay update immediately without restarting the slideshow.
 17. **Placement editor**: Drag a plugin, resize it, enable grid snap, change the grid size, and confirm the placement and grid settings survive restart; the box stays inside the safe area.
 
@@ -334,12 +331,12 @@ The Phase 0 product decisions formerly tracked as open questions:
 | Question | Decision |
 |---|---|
 | Plugin scripts | Sandboxed HTML/CSS/JavaScript; not Dart, because runtime-installed Dart cannot be safely sandboxed and would expose the host process |
-| Plugin distribution | Local ZIP only; no URL install or catalog in v1. Bundled reference plugins are preinstalled. |
+| Plugin distribution | Local ZIP only; no URL install or catalog in v1. Bundled example plugins are seeded on first run and are ordinary removable plugins afterward. |
 | Plugin bundle contents | `plugin.json` metadata/settings/inputs, HTML/CSS/optional JS, optional screenshots and icon |
 | Signatures | No signatures in v1; explicit consent, permissions shown, SHA-256 recorded |
 | Plugin screens | Plugin rendering is slideshow-only in v1; per-plugin settings screens are app-rendered |
 | Plugin limits | 20 MB ZIP, 100 MB extracted, 500 files, 20 installed, 10 active, one instance per plugin in v1, 1 MB storage, 10 actions/minute, API v1 |
-| Built-in overlays vs plugins | All overlays are bundled plugins, including clock/weather/metadata; compiled-in overlays are removed after migration |
+| Built-in overlays vs plugins | All overlays are bundled example plugins, including clock/weather/metadata; they can be disabled or deleted like any plugin, and compiled-in overlays are removed |
 | Plugin placement | Free drag-and-drop with resize; optional snap-to-grid with a persisted grid size in the Plugins screen |
 | Plugin settings | Each installed plugin has its own settings screen rendered from its manifest schema |
 | Plugin playback actions | Declared and user-granted next/previous/pause/mute/open settings/open media selection; rate-limited |

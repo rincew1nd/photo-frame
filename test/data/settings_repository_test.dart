@@ -120,7 +120,7 @@ void main() {
       'automation': <String, dynamic>{'kiosk': true, 'launcherMode': true},
     });
 
-    expect(migrated.schemaVersion, 3);
+    expect(migrated.schemaVersion, 4);
     expect(migrated.playback.livePhotoMode, LivePhotoMode.loop);
     expect(
       migrated.playback.videoPlaybackMode,
@@ -192,7 +192,7 @@ void main() {
       },
     });
 
-    expect(loaded.schemaVersion, 3);
+    expect(loaded.schemaVersion, 4);
     expect(loaded.filters.selectedAssetIds, <String>{'asset-1'});
     expect(loaded.playback.livePhotoMode, LivePhotoMode.off);
     expect(loaded.defaultProfile.imageMotion, isTrue);
@@ -218,7 +218,7 @@ void main() {
       },
     });
 
-    expect(migrated.schemaVersion, 3);
+    expect(migrated.schemaVersion, 4);
     expect(migrated.automation.startOnBoot, isTrue);
     expect(migrated.automation.fullscreen, isTrue);
     expect(migrated.automation.kiosk, isTrue);
@@ -229,6 +229,36 @@ void main() {
     expect(automation['fullscreen'], isTrue);
     expect(automation['kiosk'], isTrue);
     expect(automation['updateChecks'], isFalse);
+  });
+
+  test('plugin settings migrate, clamp, and roundtrip', () {
+    const defaults = AppSettings();
+    expect(defaults.plugins.gridSnap, isFalse);
+    expect(defaults.plugins.gridSize, 16);
+    expect(defaults.plugins.seededExamplesVersion, 0);
+
+    final migrated = migrate(<String, dynamic>{'schemaVersion': 3});
+    expect(migrated.schemaVersion, 4);
+    expect(migrated.plugins.gridSnap, isFalse);
+    expect(migrated.plugins.gridSize, 16);
+
+    final clamped = migrate(<String, dynamic>{
+      'schemaVersion': 3,
+      'plugins': <String, dynamic>{'gridSize': 1},
+    });
+    expect(clamped.plugins.gridSize, 4);
+
+    const settings = AppSettings(
+      plugins: PluginSettings(
+        gridSnap: true,
+        gridSize: 999,
+        seededExamplesVersion: 2,
+      ),
+    );
+    final decoded = AppSettings.fromJson(settings.toJson());
+    expect(decoded.plugins.gridSnap, isTrue);
+    expect(decoded.plugins.gridSize, 256);
+    expect(decoded.plugins.seededExamplesVersion, 2);
   });
 
   test('round trips new fields and customizations through JSON', () {

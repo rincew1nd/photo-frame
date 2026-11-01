@@ -99,7 +99,7 @@ The slideshow is a Flutter `Stack` with three logical layers:
 
 1. Photo/video layer: image widget or media_kit video texture.
 2. Plugin layer: one transparent interactive webview per plugin instance, positioned by the host.
-   This includes the clock, weather, and metadata overlays, which ship as bundled plugins.
+   This includes the clock, weather, and metadata overlays, which ship as bundled example plugins.
 3. App controls/dialogs layer: Flutter widgets.
 
 ### Plugin composition
@@ -247,9 +247,8 @@ Plugin actions
    APIs, not direct access.
 6. **Local ZIP plugin distribution.** No marketplace, remote install, or signatures in v1.
 7. **All overlays are plugins.** Clock, weather, and metadata ship as bundled HTML/CSS/JS plugins;
-   no compiled-in overlay remains after migration.
-8. **No data migration from the legacy app.** New application ID; fresh setup. Overlay-to-plugin
-   migration applies only within this app's settings.
+   the compiled overlay widgets have been removed.
+8. **No data migration from the legacy app.** New application ID; fresh setup.
 9. **No Pi/iOS/macOS.** The architecture stays portable but no platform work is done.
 
 ## 12. Build and packaging
@@ -274,7 +273,7 @@ with FFmpeg codecs.
 | libmpv codec availability | Pin FFmpeg build; test HEVC/AV1/ProRes; fallback to Immich playback stream |
 | DNG/ProRAW quality/performance | LibRaw version test; embedded preview first; screen-sized cache |
 | WebView version on no-GMS devices | Runtime version check; disable plugins below baseline; slideshow runs without overlays |
-| All overlays depend on the plugin host | Ship clock/weather/metadata as bundled plugins; prove the Phase 0 transparency gate before removing compiled overlays |
+| All overlays depend on the plugin host | Ship clock/weather/metadata as bundled example plugins; compiled overlays are removed |
 | 24/7 leaks | Soak tests, bounded caches, watchdog restarts |
 | Plugin supply chain | Explicit ZIP import, permission consent, sandbox, no secrets exposed |
 | HEVC patent licensing | Legal review before broad commercial distribution |

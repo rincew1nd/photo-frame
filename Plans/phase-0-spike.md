@@ -159,7 +159,7 @@ No-go triggers:
 ## Out of scope
 
 - Production UI, navigation, settings, cache, real Immich integration.
-- Full plugin API, install UI, reference plugins.
+- Full plugin API, install UI, bundled example plugins.
 - Release packaging/signing.
 - Pi/iOS/macOS.
 
