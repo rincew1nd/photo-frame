@@ -172,7 +172,8 @@ lib/features/plugins/     plugin list, install/details, per-plugin settings, pla
 lib/data/plugins/         manifest, bundle validation, store, registry, storage, migration
 lib/domain/plugins/       snapshot builder, placement model
 lib/plugins/host/         loopback server, host page, bridge, adapters, watchdog
-assets/plugins/           bundled example ZIPs
+plugins/examples/         bundled example plugin sources
+plugins/zips/             packaged example ZIPs loaded by the app
 test/...                  unit/widget/integration/security/performance/migration tests
 ```
 
@@ -199,7 +200,7 @@ test/...                  unit/widget/integration/security/performance/migration
 - Add DB schema v4 tables: `plugin_registry`, `plugin_instances`, `plugin_storage`; add migration.
 - Implement plugin store/registry/config/storage lifecycle, quotas, and atomic update/uninstall.
 - Add settings v4 placement grid fields (snap enabled, grid size) and a seed/migration marker.
-- Seed bundled example ZIPs from `assets/plugins/` through the normal install path.
+- Seed bundled example ZIPs from `plugins/zips/` through the normal install path.
 
 **Exit:** unit tests for manifests, ZIPs, registry/storage, and DB migration; no UI rendering yet.
 

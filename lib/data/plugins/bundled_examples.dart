@@ -24,7 +24,7 @@ Future<List<BundledPluginSource>> loadBundledExampleSources() async {
   final sources = <BundledPluginSource>[];
   for (final entry in _enabledByDefault.entries) {
     final name = _assetName(entry.key);
-    final data = await rootBundle.load('assets/plugins/$name.zip');
+    final data = await rootBundle.load('plugins/zips/$name.zip');
     sources.add(
       BundledPluginSource(
         id: entry.key,

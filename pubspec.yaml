@@ -49,7 +49,7 @@ flutter:
   generate: true
   uses-material-design: true
   assets:
-    - assets/plugins/
+    - plugins/zips/
 
 dependency_overrides:
   flutter_secure_storage_windows:

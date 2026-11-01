@@ -1,0 +1,24 @@
+{
+  "id": "com.rincew1nd.photoframe.weather",
+  "name": "Weather",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "minAppVersion": "1.0.0",
+  "author": "Photo Frame",
+  "license": "MIT",
+  "description": "Current weather from the host weather service.",
+  "entry": "index.html",
+  "permissions": { "network": false },
+  "inputs": ["weather", "config"],
+  "placement": { "anchor": "top-end", "x": 0.70, "y": 0.06, "width": 230, "height": 96, "zOrder": 10, "showDuringNight": false },
+  "settings": {
+    "latitude": { "type": "number", "label": "Latitude", "default": 0, "min": -90, "max": 90, "step": 0.0001 },
+    "longitude": { "type": "number", "label": "Longitude", "default": 0, "min": -180, "max": 180, "step": 0.0001 },
+    "unit": { "type": "select", "label": "Unit", "default": "celsius", "options": [
+      { "value": "celsius", "label": "Celsius" }, { "value": "fahrenheit", "label": "Fahrenheit" } ] },
+    "locationLabel": { "type": "text", "label": "Location label", "default": "" },
+    "backgroundColor": { "type": "color", "label": "Background color", "default": "#000000" },
+    "backgroundOpacity": { "type": "number", "label": "Background opacity", "default": 0.8, "min": 0, "max": 1, "step": 0.05 },
+    "cornerRadius": { "type": "number", "label": "Corner radius", "default": 2, "min": 0, "max": 8, "step": 0.5 }
+  }
+}

@@ -1,0 +1,14 @@
+html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; }
+.card { box-sizing: border-box; width: 100%; height: 100%; padding: 8px 10px;
+  display: flex; flex-direction: column; justify-content: center;
+  background: rgba(0,0,0,0.8); border-radius: 2em;
+  color: #fff; font-family: "Segoe UI", sans-serif;
+  text-shadow: 0 2px 14px rgba(0,0,0,0.78), 0 0 2px rgba(0,0,0,0.55); }
+.value { font-size: 40px; font-weight: 300; line-height: 1; letter-spacing: -0.02em; }
+.media-title { font-size: 30px; font-weight: 300; line-height: 1.05; letter-spacing: -0.02em; }
+.body { font-size: 14px; line-height: 1.35; opacity: 0.92; }
+.dim { font-size: 12px; opacity: 0.68; }
+.controls { display: flex; gap: 6px; margin-top: 6px; }
+.controls button { flex: 1; padding: 4px 6px; border: 0; border-radius: 6px;
+  background: rgba(255,255,255,0.16); color: #fff; font: inherit; cursor: pointer; }
+.controls button:active { background: rgba(255,255,255,0.32); }
