@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Photo Frame Plugin Playground</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="playground.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="brand">
+      <span class="brand-mark">P</span>
+      <div>
+        <h1>Plugin Playground</h1>
+        <p class="subtle">Edit the source, run it sandboxed, inspect the bridge.</p>
+      </div>
+    </div>
+    <div class="toolbar-actions">
+      <label class="field">
+        <span>Example</span>
+        <select id="example-select">
+          <option value="playback" selected>playback</option>
+          <option value="clock">clock</option>
+          <option value="weather">weather</option>
+          <option value="metadata">metadata</option>
+          <option value="calendar">calendar</option>
+          <option value="image-info">image-info</option>
+        </select>
+      </label>
+      <button id="load-example" class="button">Load example</button>
+      <label class="button file-button">
+        Load folder
+        <input id="folder-input" type="file" webkitdirectory multiple hidden>
+      </label>
+      <button id="run" class="button primary">Run</button>
+      <label class="check">
+        <input id="auto-run" type="checkbox" checked>
+        <span>Auto-run</span>
+      </label>
+      <span id="status" class="status">Starting…</span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="panel editor-panel" aria-label="Editor">
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="source" role="tab">Source</button>
+        <button class="tab" data-tab="inputs" role="tab">Inputs</button>
+        <button class="tab" data-tab="logs" role="tab">Logs <span id="log-count" class="badge">0</span></button>
+      </nav>
+
+      <div id="tab-source" class="tab-panel active">
+        <div id="file-tabs" class="file-tabs"></div>
+        <textarea id="source-editor" class="editor" spellcheck="false" aria-label="Plugin source"></textarea>
+        <p class="hint">Ctrl+Enter runs the preview. Edits auto-run after 500 ms.</p>
+      </div>
+
+      <div id="tab-inputs" class="tab-panel">
+        <div class="inputs-grid">
+          <div class="inputs-column">
+            <label class="input-label" for="state-editor">Mock state (JSON)</label>
+            <textarea id="state-editor" class="editor small" spellcheck="false"></textarea>
+          </div>
+          <div class="inputs-column">
+            <label class="input-label" for="config-editor">Mock config (JSON)</label>
+            <textarea id="config-editor" class="editor small" spellcheck="false"></textarea>
+          </div>
+        </div>
+        <div class="row-actions">
+          <button id="apply-inputs" class="button primary">Apply inputs</button>
+          <button id="reset-inputs" class="button">Reset mock</button>
+          <span id="input-status" class="subtle"></span>
+        </div>
+        <div class="hints">
+          <div>
+            <span class="hint-label">Declared inputs</span>
+            <code id="hint-inputs">—</code>
+          </div>
+          <div>
+            <span class="hint-label">Declared actions</span>
+            <code id="hint-actions">—</code>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-logs" class="tab-panel">
+        <div class="row-actions logs-actions">
+          <button id="clear-logs" class="button">Clear logs</button>
+          <span class="subtle">Console, bridge calls, errors, and reloads.</span>
+        </div>
+        <ol id="log-list" class="log-list"></ol>
+      </div>
+    </section>
+
+    <section class="panel preview-panel" aria-label="Preview">
+      <div class="preview-header">
+        <span class="preview-title">Preview</span>
+        <span id="preview-dims" class="subtle">—</span>
+        <label class="check">
+          <input id="outline" type="checkbox">
+          <span>Outline</span>
+        </label>
+      </div>
+      <div id="preview-surface" class="preview-surface">
+        <div id="preview-empty" class="preview-empty">Load a plugin to preview it.</div>
+        <div id="preview-shell" class="preview-shell" hidden></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="host-sdk.js"></script>
+  <script src="playground.js"></script>
+</body>
+</html>
