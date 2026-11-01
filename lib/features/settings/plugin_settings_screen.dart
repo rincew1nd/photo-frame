@@ -257,7 +257,7 @@ class _PluginDetailsState extends ConsumerState<_PluginDetails>
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              'Drag-and-drop placement is wired into the slideshow in M5.',
+              'Move and resize this plugin from the slideshow.',
             ),
           ),
           const SettingsSectionHeader('Actions'),

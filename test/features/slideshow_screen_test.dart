@@ -1067,7 +1067,6 @@ void main() {
       overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
     );
     expect(find.text('fake-video'), findsOneWidget);
-    expect(find.text('Live Photo motion in Phase 3'), findsNothing);
     expect(fake.openedSource?.uri, motion.path);
   });
 
@@ -1193,7 +1192,6 @@ void main() {
       overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
     );
     expect(find.text('fake-video'), findsNothing);
-    expect(find.text('Live Photo motion in Phase 3'), findsNothing);
     expect(find.byType(Image), findsWidgets);
   });
 
@@ -1284,7 +1282,6 @@ void main() {
 
     expect(find.text('fake-video'), findsNothing);
     expect(find.byType(Image), findsWidgets);
-    expect(find.text('Live Photo motion in Phase 3'), findsNothing);
   });
 
   testWidgets('live photo loop restarts motion after completion', (

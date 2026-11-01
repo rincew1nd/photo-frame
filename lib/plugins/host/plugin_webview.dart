@@ -32,8 +32,8 @@ PluginWebViewAdapter pluginWebViewAdapterFor(TargetPlatform platform) {
 /// A transparent, parent-sized plugin host view for one [PluginHostServer].
 ///
 /// Loads [hostUri] only: the trusted host page embeds [entryUri] in its
-/// sandboxed iframe. The widget does not manage the server or slideshow
-/// placement yet; those belong to M5.
+/// sandboxed iframe. Server lifecycle and slideshow placement are managed by
+/// the caller.
 class PluginWebView extends StatefulWidget {
   const PluginWebView({
     super.key,

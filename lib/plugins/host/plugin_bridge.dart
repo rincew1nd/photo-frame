@@ -1,8 +1,7 @@
 /// Validated plugin bridge protocol and capability policies for plugin API v1.
 ///
 /// Everything here is pure Dart over host-provided strings. It does not touch
-/// the network, render UI, or open platform channels; M3b wires it to the
-/// webview and slideshow.
+/// the network, render UI, or open platform channels.
 library;
 
 import 'dart:convert';
@@ -304,8 +303,8 @@ class PluginLinkPolicy {
   bool isAllowed(String raw) => normalize(raw) != null;
 }
 
-/// Host-proxy network policy. It does not perform HTTP itself; M3b will use
-/// [validate] plus the exposed limits around its own client.
+/// Host-proxy network policy. It does not perform HTTP itself; callers use
+/// [validate] plus the exposed limits around their own client.
 class PluginNetworkPolicy {
   const PluginNetworkPolicy({
     this.timeout = defaultTimeout,
