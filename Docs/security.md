@@ -31,9 +31,16 @@ installed plugin bundles, the local plugin server, the webview/CEF engine, and t
 - OAuth uses PKCE; no client secret is embedded.
 - Desktop OAuth uses a loopback redirect; Android uses the app’s custom scheme.
 - Blocking permissions prevent setup; optional permission (`asset.download`) degrades features.
+- Android declares `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK`, `USE_BIOMETRIC`, `USE_FINGERPRINT`, and
+  `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`; all are granted at install and no runtime permissions are
+  requested. Battery-optimization exemption is a user-granted special access for start-on-boot; the
+  app does not bypass it.
 - The app never sends credentials to plugins or third-party services.
 - Immich connection may be HTTP on a LAN; the UI should warn when the URL is not HTTPS. TLS
   certificate validation is not disabled.
+
+> Status: plugin-related items throughout this document describe the Phase 4 design target. Phase 4
+> is not started, so they are not implemented or verified.
 
 ## 4. Plugin sandbox
 
@@ -56,9 +63,9 @@ installed plugin bundles, the local plugin server, the webview/CEF engine, and t
 ### Content
 
 - Plugin ZIPs are validated for traversal, bombs, file count/size, manifest schema, entry presence,
-  and screenshot/asset types.
+  icon/screenshot/asset types, and declared snapshot inputs.
 - No native binaries, executables, or remote code includes.
-- Screenshots are displayed as images, not executed.
+- Icons and screenshots are displayed as images, not executed.
 - Plugins may contain external links; they open in the system browser after confirmation, not
   inside the plugin.
 - Navigation to `file:`, `javascript:`, `intent:`, `data:` and popups is blocked.
@@ -103,17 +110,22 @@ reduce exposure; do not expose the server on non-loopback interfaces.
 ## 6. Plugin supply chain
 
 - V1 installs local ZIPs only; no marketplace or remote URL install.
-- No signatures in v1. The user sees identity, author, version, description, screenshots,
-  permissions, and license before activation.
+- No signatures in v1. The user sees identity, author, version, description, icon, screenshots,
+  permissions, requested inputs, and license before activation.
 - SHA-256 is recorded for integrity/update comparison, not as a trust signature.
 - Updates require explicit confirmation when permissions or settings compatibility change.
 - A future version may add signatures and a curated catalog.
 
 ## 7. Updates
 
-- Android APKs are signed; the system installer verifies the signature and package identity.
-- Desktop artifacts are downloaded from GitHub releases; checksums should be published.
-- In-app update checks do not execute arbitrary remote code.
+- Android release builds currently use the debug signing key. No release keystore or GitHub release
+  channel is configured.
+- In-app update checks, APK download/install, and desktop update flows are not implemented. No update
+  path currently exists.
+- When implemented, Android APK updates must be signed; the system installer verifies the signature
+  and package identity.
+- Desktop artifacts should be published with checksums when a release channel exists.
+- In-app update checks must not execute arbitrary remote code.
 - Plugin updates are local ZIP imports, not remote code fetch.
 - Release notes document permission or security changes.
 
@@ -127,10 +139,11 @@ reduce exposure; do not expose the server on non-loopback interfaces.
 
 ## 9. Biometrics
 
-- Android: biometric/device credential for media/library navigation and key reveal/copy when a lock
-  exists; fail-open for navigation without a lock (BR-07).
-- Windows: Windows Hello if available; fail-open otherwise.
-- Linux: no standard equivalent; fail-open and document.
+- Android: biometric/device credential gate for media selection and API-key reveal/copy when a lock
+  exists; fail-open without a lock (BR-07). Code-level gating is implemented; device verification is
+  pending.
+- Windows: Windows Hello if available; fail-open otherwise. Not runtime-verified.
+- Linux: no standard equivalent; fail-open and document. Not runtime-verified.
 - Biometric prompts do not expose secrets; failure returns to the app without revealing data.
 
 ## 10. DoS and resource limits
@@ -148,8 +161,9 @@ reduce exposure; do not expose the server on non-loopback interfaces.
 
 - File logs rotate; no secrets.
 - Crash reports are local; no automatic upload.
-- Diagnostics include app version, plugin API version, platform, WebView/CEF version, cache stats,
-  and recent redacted errors.
+- About & diagnostics shows app version/build, plugin API v1, platform/OS version, cache statistics,
+  recent redacted logs, error count with copy, and opens the Flutter license page.
+- WebView/CEF versions are not shown; Phase 4 is not started.
 - Plugin errors are attributed by plugin ID/instance without leaking library data.
 - Log sharing is user-initiated.
 
@@ -165,9 +179,14 @@ reduce exposure; do not expose the server on non-loopback interfaces.
 | CEF/webview engine vulnerabilities | Keep CEF/system WebView updated; pin/bump releases |
 | HTTP Immich URL on LAN | Warn; user chooses; TLS validation remains on |
 | Unencrypted local media cache | OS disk encryption boundary |
-| Plugin screenshots could contain misleading content | Shown as untrusted images; user consents |
+| No release channel or release signing; Android release builds use debug signing | Open; blocks update flow and signature continuity |
+| Plugin icons/screenshots could contain misleading content | Shown as untrusted images; user consents |
 
 ## 13. Security testing
+
+Current automated coverage includes secret redaction, settings migrations, cache, and API-key
+reveal/copy gating. Plugin, loopback-server, and update-signature tests are pending Phase 4 and
+release work.
 
 - Secret redaction tests.
 - ZIP traversal/bomb/oversize tests.
@@ -176,5 +195,5 @@ reduce exposure; do not expose the server on non-loopback interfaces.
 - Links: external confirmation, blocked schemes/popups.
 - Action/permission/rate-limit tests.
 - Loopback server path/traversal/token tests.
-- Update signature/package checks.
+- Update signature/package checks (pending release signing and update flow).
 - Soak/failure injection: hung plugin, killed webview, disk full, auth revoked.

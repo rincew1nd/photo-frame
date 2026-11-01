@@ -64,11 +64,14 @@ HDR/10-bit originals are decoded and tone-mapped to SDR. True HDR output is out 
 - CEF is the same Chromium generation on Windows and Linux; plugin behavior is consistent.
 - Android uses the system WebView, avoiding a second bundled browser engine.
 - Interactive plugins are possible with real HTML/CSS/JS, sandboxing, and input.
+- All overlays, including clock/weather/metadata, can share one plugin host instead of maintaining
+  separate compiled overlay code.
 
 ### Negative
 
 - No reuse of the existing Kotlin/Compose application.
 - True HDR output is not possible; HDR content is tone-mapped to SDR.
+- All overlays depend on the WebView/CEF host; below the Android baseline the frame has no overlays.
 - CEF adds a large desktop binary and a software readback path on Linux.
 - Canvas/CEF transparency and Android platform-view z-order are the highest technical risks.
 - Android plugin support depends on the system WebView version.
@@ -83,7 +86,7 @@ HDR/10-bit originals are decoded and tone-mapped to SDR. True HDR output is out 
 | Linux full-screen CEF readback is too expensive | Per-plugin small webviews; low OSR frame rate; only push state at 1 Hz |
 | libmpv build lacks a needed codec | Pin FFmpeg/libmpv build; test HEVC/AV1/ProRes; Immich playback stream as last resort |
 | ProRAW is not handled well by LibRaw | Test early; use embedded preview fallback; document limitations |
-| Android WebView is old or missing | Version check; degrade plugins; built-in overlays remain functional |
+| Android WebView is old or missing | Version check; degrade plugins; slideshow runs without overlays because all overlays are plugins |
 | 24/7 memory growth | Soak tests, bounded caches, watchdog restarts |
 
 ## Phase 0 validation (2026-10-27)

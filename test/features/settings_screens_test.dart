@@ -1,25 +1,39 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:photoframe/app/providers.dart';
 import 'package:photoframe/core/logging/app_logger.dart';
 import 'package:photoframe/data/cache/cache_assets.dart';
 import 'package:photoframe/data/cache/cache_store.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/data/settings/settings_repository.dart';
+import 'package:photoframe/features/settings/about_settings_screen.dart';
 import 'package:photoframe/features/settings/automation_settings_screen.dart';
 import 'package:photoframe/features/settings/cache_settings_screen.dart';
 import 'package:photoframe/features/settings/playback_settings_screen.dart';
 import 'package:photoframe/features/settings/plugins_settings_screen.dart';
 import 'package:photoframe/features/settings/slideshow_settings_screen.dart';
 import 'package:photoframe/l10n/app_localizations.dart';
+import 'package:photoframe/platform/services.dart';
+
+class _FakeAutostart implements AutostartService {
+  @override
+  Future<bool> get supported async => true;
+
+  @override
+  Future<void> setEnabled(bool enabled) async {}
+}
 
 Future<void> _pump(
   WidgetTester tester, {
   required InMemorySettingsRepository repository,
   required Widget screen,
   CacheStore? cacheStore,
+  AppLogger? logger,
   List<Override> overrides = const <Override>[],
 }) async {
   await tester.binding.setSurfaceSize(const Size(1200, 3000));
@@ -29,7 +43,7 @@ Future<void> _pump(
       overrides: [
         settingsRepositoryProvider.overrideWithValue(repository),
         cacheStoreProvider.overrideWithValue(cacheStore ?? MemoryCacheStore()),
-        appLoggerProvider.overrideWithValue(AppLogger()),
+        appLoggerProvider.overrideWithValue(logger ?? AppLogger()),
         ...overrides,
       ],
       child: MaterialApp(
@@ -205,10 +219,7 @@ void main() {
     await tester.pumpAndSettle();
     expect((await repository.load()).defaultProfile.panStrength, 40);
 
-    expect(
-      find.widgetWithText(ListTile, 'Customizations'),
-      findsOneWidget,
-    );
+    expect(find.widgetWithText(ListTile, 'Customizations'), findsOneWidget);
   });
 
   testWidgets('automation screen saves automation and night mode', (
@@ -219,20 +230,34 @@ void main() {
       tester,
       repository: repository,
       screen: const AutomationSettingsScreen(),
+      overrides: [
+        autostartServiceProvider.overrideWithValue(_FakeAutostart()),
+        permissionsServiceProvider.overrideWithValue(
+          const UnsupportedPermissions(),
+        ),
+      ],
     );
 
-    expect(
-      tester
-          .widget<SwitchListTile>(
-            find.widgetWithText(SwitchListTile, 'Start on boot'),
-          )
-          .onChanged,
-      isNull,
-    );
+    final startOnBoot = find.widgetWithText(SwitchListTile, 'Start on boot');
+    expect(find.text('Starts the slideshow after reboot.'), findsOneWidget);
+    expect(tester.widget<SwitchListTile>(startOnBoot).onChanged, isNotNull);
+    await tester.tap(startOnBoot);
+    await tester.pumpAndSettle();
+    expect((await repository.load()).automation.startOnBoot, isTrue);
 
     await tester.tap(find.widgetWithText(SwitchListTile, 'Fullscreen'));
     await tester.pumpAndSettle();
     expect((await repository.load()).automation.fullscreen, isTrue);
+
+    await tester.tap(find.widgetWithText(SwitchListTile, 'Fullscreen'));
+    await tester.pumpAndSettle();
+    expect((await repository.load()).automation.fullscreen, isFalse);
+
+    await tester.tap(find.widgetWithText(SwitchListTile, 'Kiosk mode'));
+    await tester.pumpAndSettle();
+    final automation = (await repository.load()).automation;
+    expect(automation.kiosk, isTrue);
+    expect(automation.fullscreen, isTrue);
 
     await tester.tap(find.widgetWithText(SwitchListTile, 'Keep screen on'));
     await tester.pumpAndSettle();
@@ -298,10 +323,7 @@ void main() {
     await tester.enterText(find.byType(TextField), '2048');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
-    expect(
-      (await repository.load()).cache.quotaBytes,
-      2048 * 1024 * 1024,
-    );
+    expect((await repository.load()).cache.quotaBytes, 2048 * 1024 * 1024);
 
     tester.widget<Slider>(find.byType(Slider).last).onChanged!(5);
     await tester.pumpAndSettle();
@@ -314,6 +336,48 @@ void main() {
     await tester.tap(find.text('Clear'));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('about screen shows platform, cache, licenses, and errors', (
+    tester,
+  ) async {
+    PackageInfo.setMockInitialValues(
+      appName: 'Photo Frame',
+      packageName: 'com.rincew1nd.photoframe',
+      version: '1.2.3',
+      buildNumber: '45',
+      buildSignature: '',
+    );
+    final store = MemoryCacheStore();
+    final cachedAt = DateTime.utc(2026, 1, 2, 3, 4);
+    await store.upsertAsset(
+      CachedAsset(
+        id: 'photo-1',
+        sizeBytes: 1024,
+        cachedAt: cachedAt,
+        lastAccessedAt: cachedAt,
+      ),
+    );
+    final logger = AppLogger()..error('sync failed');
+
+    await _pump(
+      tester,
+      repository: InMemorySettingsRepository(),
+      screen: const AboutSettingsScreen(),
+      cacheStore: store,
+      logger: logger,
+    );
+
+    expect(find.text('Platform'), findsOneWidget);
+    expect(find.text(Platform.operatingSystem), findsOneWidget);
+    expect(find.text(Platform.operatingSystemVersion), findsOneWidget);
+    expect(find.text('Cache'), findsOneWidget);
+    expect(find.text('1 · 1.0 KB'), findsOneWidget);
+    expect(find.text('1.0 KB'), findsOneWidget);
+    expect(find.text('Never synced'), findsOneWidget);
+    expect(find.text('Licenses'), findsOneWidget);
+    expect(find.text('Crash reports'), findsOneWidget);
+    expect(find.text('1 error logged'), findsOneWidget);
   });
 
   testWidgets('plugins screen saves overlays and weather location', (

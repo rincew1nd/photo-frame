@@ -1,5 +1,4 @@
-#!/usr/bin/env pwsh
-#Requires -Version 7.0
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Fetch and build the native still-image decoders for Windows x64.

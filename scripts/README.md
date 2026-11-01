@@ -1,3 +1,49 @@
+# Packaging releases
+
+The packaging scripts build a release artifact and stage it under `dist/`.
+Run them from the repository root with Bash. On Windows use Git Bash
+(`C:\Program Files\Git\bin\bash.exe`), not WSL. Each script accepts a flag to
+skip the Flutter build and package an existing build instead.
+
+## Windows x64
+
+```bash
+bash scripts/package-windows.sh
+bash scripts/package-windows.sh --skip-build
+```
+
+The build runs `flutter build windows --release --no-pub` from the repo root,
+copies `build/windows/x64/runner/Release` to
+`dist/photo-frame-windows-x64`, and writes
+`dist/photo-frame-windows-x64.zip`. The ZIP path is printed.
+
+## Linux x64
+
+```bash
+bash scripts/package-linux.sh
+bash scripts/package-linux.sh --skip-build
+```
+
+The build runs `flutter build linux --release --no-pub` from the repo root,
+copies `build/linux/x64/release/bundle` to `dist/photo-frame-linux-x64`, and
+writes `dist/photo-frame-linux-x64.tar.gz`. The archive path is printed.
+
+## Android
+
+```bash
+bash scripts/package-android.sh
+bash scripts/package-android.sh --skip-build
+```
+
+The build runs `flutter build apk --release --split-per-abi --no-pub` from the
+repo root, copies the split `*-release.apk` files from
+`build/app/outputs/flutter-apk` to `dist/photo-frame-android`, and writes
+`sha256sums.txt` next to them. The output directory is printed.
+
+Android release signing and GitHub publishing are not handled by these
+scripts. Both remain separate and blocked until a signing key and a publishing
+workflow are set up.
+
 # Native still codec scripts
 
 These scripts fetch and build the native decoders used for HEIC, AVIF, and RAW
@@ -6,9 +52,9 @@ stills. They are build helpers only; the Flutter app does not run them.
 ## Windows x64
 
 `fetch-stills-deps.ps1` builds libheif 1.19.7, libde265 1.0.15, dav1d 1.5.0,
-and LibRaw 0.21.3 from pinned upstream sources. It needs PowerShell 7 and an
-**x64 Native Tools Command Prompt for VS 2022** (or a VS 2022 Developer
-PowerShell) with:
+and LibRaw 0.21.3 from pinned upstream sources. It requires Windows PowerShell
+5.1 (not PowerShell 7) and needs an **x64 Native Tools Command Prompt for VS 2022** (or
+a VS 2022 Developer PowerShell) with:
 
 - Visual Studio 2022 C++ desktop tools (`cl.exe`)
 - CMake and Ninja
@@ -18,7 +64,7 @@ PowerShell) with:
 Run it from the repository root:
 
 ```powershell
-pwsh -File scripts/fetch-stills-deps.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/fetch-stills-deps.ps1
 ```
 
 Each component is skipped when its DLL and import library already exist. Delete
@@ -45,10 +91,11 @@ scripts (see `.github/workflows/ci.yml`).
 
 ## Verification status
 
-These scripts have not been run in this development environment. They must be
-verified on a native Windows toolchain before relying on them. Without the
-built libraries the app falls back to Immich preview images for HEIC, AVIF, and
-RAW stills.
+`fetch-stills-deps.ps1` parsed successfully under Windows PowerShell 5.1. The
+full native still build was not rerun in the latest verification; earlier
+Windows native stills were built locally (see `../Docs/phase-3-verification.md`).
+Without the built libraries the app falls back to Immich preview images for
+HEIC, AVIF, and RAW stills.
 
 ## Upstream build notes
 

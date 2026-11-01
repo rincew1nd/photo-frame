@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photoframe/app/connection_providers.dart' as conn;
@@ -12,6 +13,25 @@ import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/data/settings/settings_repository.dart';
 import 'package:photoframe/features/settings/connection_settings_screen.dart';
 import 'package:photoframe/l10n/app_localizations.dart';
+import 'package:photoframe/platform/services.dart';
+
+class _FakeBiometrics implements BiometricsService {
+  _FakeBiometrics({this.allow = true});
+
+  final bool allow;
+  int calls = 0;
+  String? reason;
+
+  @override
+  Future<bool> get canAuthenticate async => true;
+
+  @override
+  Future<bool> authenticate(String reason) async {
+    calls++;
+    this.reason = reason;
+    return allow;
+  }
+}
 
 class _FakeConnectionController extends conn.ConnectionController {
   _FakeConnectionController(this.initial);
@@ -53,7 +73,7 @@ conn.ConnectionState _connectedState() {
   );
 }
 
-Future<void> _pump(WidgetTester tester) async {
+Future<void> _pump(WidgetTester tester, {BiometricsService? biometrics}) async {
   final repository = InMemorySettingsRepository();
   final logger = AppLogger();
   final secure = MemorySecureStore(<String, String>{
@@ -70,6 +90,9 @@ Future<void> _pump(WidgetTester tester) async {
         settingsRepositoryProvider.overrideWithValue(repository),
         cacheStoreProvider.overrideWithValue(MemoryCacheStore()),
         appLoggerProvider.overrideWithValue(logger),
+        biometricsServiceProvider.overrideWithValue(
+          biometrics ?? _FakeBiometrics(),
+        ),
         conn.authServiceProvider.overrideWithValue(
           AuthService(secure: secure, settings: repository, logger: logger),
         ),
@@ -102,7 +125,10 @@ void main() {
     expect(apiKey.obscureText, isTrue);
     expect(apiKey.controller!.text, 'super-secret-key');
 
-    expect(find.widgetWithText(FilledButton, 'Save connection'), findsOneWidget);
+    expect(
+      find.widgetWithText(FilledButton, 'Save connection'),
+      findsOneWidget,
+    );
     expect(find.byKey(const Key('connection-test')), findsOneWidget);
     expect(find.text('Manage albums'), findsNothing);
     expect(find.text('Reveal API key'), findsNothing);
@@ -110,7 +136,8 @@ void main() {
   });
 
   testWidgets('eye icon reveals the API key', (tester) async {
-    await _pump(tester);
+    final biometrics = _FakeBiometrics();
+    await _pump(tester, biometrics: biometrics);
 
     await tester.tap(find.byTooltip('Show API key'));
     await tester.pumpAndSettle();
@@ -120,5 +147,50 @@ void main() {
     );
     expect(apiKey.obscureText, isFalse);
     expect(find.byTooltip('Hide API key'), findsOneWidget);
+    expect(biometrics.calls, 1);
+    expect(biometrics.reason, 'Reveal API key');
+  });
+
+  testWidgets('denied authentication keeps the API key obscured', (
+    tester,
+  ) async {
+    final biometrics = _FakeBiometrics(allow: false);
+    await _pump(tester, biometrics: biometrics);
+
+    await tester.tap(find.byTooltip('Show API key'));
+    await tester.pumpAndSettle();
+
+    final apiKey = tester.widget<TextField>(
+      find.byKey(const Key('connection-api-key')),
+    );
+    expect(apiKey.obscureText, isTrue);
+    expect(biometrics.calls, 1);
+  });
+
+  testWidgets('copy icon authenticates and copies the API key', (tester) async {
+    final biometrics = _FakeBiometrics();
+    final clipboard = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        clipboard.add(call);
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await _pump(tester, biometrics: biometrics);
+
+    await tester.tap(find.byKey(const Key('connection-copy-key')));
+    await tester.pumpAndSettle();
+
+    expect(biometrics.calls, 1);
+    expect(biometrics.reason, 'Copy API key');
+    expect(clipboard.any((call) => call.method == 'Clipboard.setData'), isTrue);
+    expect(find.text('API key copied'), findsOneWidget);
   });
 }

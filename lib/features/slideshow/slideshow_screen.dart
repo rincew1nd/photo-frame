@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:photoframe/app/connection_providers.dart';
@@ -12,12 +13,14 @@ import 'package:photoframe/data/immich/models.dart';
 import 'package:photoframe/data/media/playback.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/data/weather/weather_service.dart';
+import 'package:photoframe/domain/display/night_mode_service.dart';
 import 'package:photoframe/domain/media/ken_burns.dart';
 import 'package:photoframe/domain/media/media_filters.dart';
 import 'package:photoframe/features/slideshow/live_photo_slide.dart';
 import 'package:photoframe/features/slideshow/slideshow_controller.dart';
 import 'package:photoframe/features/slideshow/video_slide.dart';
 import 'package:photoframe/platform/paths.dart';
+import 'package:photoframe/platform/services.dart';
 
 /// Full-screen slideshow with overlays, controls, and Ken Burns motion.
 class SlideshowScreen extends ConsumerStatefulWidget {
@@ -34,10 +37,23 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
   MediaPlayback? _preloadedPlayback;
   String? _preloadedAssetId;
   String? _preloadingAssetId;
+  late final BrightnessService _brightness;
+  double? _appliedBrightness;
 
   @override
   void initState() {
     super.initState();
+    _brightness = ref.read(brightnessServiceProvider);
+    ref.listenManual(
+      slideshowControllerProvider,
+      (previous, next) => _syncBrightness(),
+      fireImmediately: true,
+    );
+    ref.listenManual(
+      settingsControllerProvider,
+      (previous, next) => _syncBrightness(),
+      fireImmediately: true,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _weatherRequested) {
         return;
@@ -50,8 +66,28 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
     });
   }
 
+  void _syncBrightness() {
+    final state = ref.read(slideshowControllerProvider).value;
+    final settings = ref.read(settingsControllerProvider).value;
+    if (state == null || settings == null) {
+      return;
+    }
+    final active = state.nightMode && !state.loading && state.assets.isNotEmpty;
+    final desired = active
+        ? NightModeService.screenBrightness(settings.nightMode.dimOpacity)
+        : null;
+    if (desired == _appliedBrightness) {
+      return;
+    }
+    _appliedBrightness = desired;
+    unawaited(_brightness.setWindowBrightness(desired));
+  }
+
   @override
   void dispose() {
+    if (_appliedBrightness != null) {
+      unawaited(_brightness.setWindowBrightness(null));
+    }
     final preloaded = _preloadedPlayback;
     _preloadedPlayback = null;
     _preloadedAssetId = null;
@@ -78,7 +114,8 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
       return;
     }
     final type = cached.type;
-    final wantsLive = type == MediaKind.livePhoto && liveMode != LivePhotoMode.off;
+    final wantsLive =
+        type == MediaKind.livePhoto && liveMode != LivePhotoMode.off;
     final wantsVideo =
         type == MediaKind.video &&
         settings.playback.videoPlaybackMode == VideoPlaybackMode.full;
@@ -120,7 +157,11 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
         // ponytail: a failed preload falls back to on-slide startup
       }
       // Keep it only while the asset that will consume it is still next.
-      final currentId = ref.read(slideshowControllerProvider).value?.current?.id;
+      final currentId = ref
+          .read(slideshowControllerProvider)
+          .value
+          ?.current
+          ?.id;
       if (mounted && _preloadingAssetId == next.id && currentId != next.id) {
         _preloadedPlayback = playback;
         _preloadedAssetId = next.id;
@@ -189,25 +230,42 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
         }
       });
     }
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: asyncState.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => const Center(
-          child: Text(
-            'Unable to load slideshow',
-            style: TextStyle(color: Colors.white70),
+    final kiosk =
+        (Platform.isWindows || Platform.isLinux) && settings.automation.kiosk;
+    return Focus(
+      autofocus: true,
+      child: CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          const SingleActivator(LogicalKeyboardKey.escape): _toggleControls,
+          const SingleActivator(LogicalKeyboardKey.f10): () =>
+              context.push('/settings'),
+        },
+        child: MouseRegion(
+          cursor: kiosk && !_controlsVisible
+              ? SystemMouseCursors.none
+              : MouseCursor.defer,
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            body: asyncState.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stackTrace) => const Center(
+                child: Text(
+                  'Unable to load slideshow',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ),
+              data: (state) {
+                if (state.loading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (state.assets.isEmpty) {
+                  return _noItems(state);
+                }
+                return _slideshow(state, settings);
+              },
+            ),
           ),
         ),
-        data: (state) {
-          if (state.loading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (state.assets.isEmpty) {
-            return _noItems(state);
-          }
-          return _slideshow(state, settings);
-        },
       ),
     );
   }
@@ -279,12 +337,9 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
             settings.playback.livePhotoMode == LivePhotoMode.bounce)
         ? LivePhotoMode.loop
         : settings.playback.livePhotoMode;
-    final showsOverlays =
-        !state.nightMode || !settings.nightMode.hideOverlays;
+    final showsOverlays = !state.nightMode || !settings.nightMode.hideOverlays;
     final motion =
-        fit == ImageFit.cover &&
-        profile.imageMotion &&
-        profile.panStrength > 0;
+        fit == ImageFit.cover && profile.imageMotion && profile.panStrength > 0;
     final media = _media(
       cached,
       fit,
@@ -441,43 +496,56 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
             .advanceIfCurrent(cached.id),
       );
       if (!motion) {
-        return video;
+        return _adaptiveBackground(video, display, thumbnail, profile);
       }
-      return _KenBurns(
-        key: ValueKey<String>(
-          'ken-burns-video-${cached.id}-${profile.panStrength}-$imageAspect',
+      return _adaptiveBackground(
+        _KenBurns(
+          key: ValueKey<String>(
+            'ken-burns-video-${cached.id}-${profile.panStrength}-$imageAspect',
+          ),
+          enabled: motion,
+          pan: profile.panStrength,
+          imageAspect: imageAspect,
+          imageFile: display,
+          intervalSeconds: slideSeconds,
+          progress: progress,
+          child: video,
         ),
-        enabled: motion,
-        pan: profile.panStrength,
-        imageAspect: imageAspect,
-        imageFile: display,
-        intervalSeconds: slideSeconds,
-        progress: progress,
-        child: video,
+        display,
+        thumbnail,
+        profile,
       );
     }
-    if (cached.type == MediaKind.livePhoto &&
-        liveMode != LivePhotoMode.off) {
-      return _KenBurns(
-        key: ValueKey<String>(
-          'ken-burns-live-${cached.id}-${profile.panStrength}-$imageAspect',
+    if (cached.type == MediaKind.livePhoto && liveMode != LivePhotoMode.off) {
+      return _adaptiveBackground(
+        _KenBurns(
+          key: ValueKey<String>(
+            'ken-burns-live-${cached.id}-${profile.panStrength}-$imageAspect',
+          ),
+          enabled: motion,
+          pan: profile.panStrength,
+          imageAspect: imageAspect,
+          imageFile: display,
+          intervalSeconds: slideSeconds,
+          progress: progress,
+          child: LivePhotoSlide(
+            key: ValueKey<String>('live-${cached.id}'),
+            preloadedPlayback: _claimPreloaded(cached.id),
+            mode: liveMode,
+            sourceBuilder: () => _livePlaybackSourceFor(cached),
+            muted: settings.playback.muted,
+            playing: playing,
+            fit: boxFit,
+            still: _SlideImage(
+              file: display,
+              thumbnail: thumbnail,
+              fit: boxFit,
+            ),
+          ),
         ),
-        enabled: motion,
-        pan: profile.panStrength,
-        imageAspect: imageAspect,
-        imageFile: display,
-        intervalSeconds: slideSeconds,
-        progress: progress,
-        child: LivePhotoSlide(
-          key: ValueKey<String>('live-${cached.id}'),
-          preloadedPlayback: _claimPreloaded(cached.id),
-          mode: liveMode,
-          sourceBuilder: () => _livePlaybackSourceFor(cached),
-          muted: settings.playback.muted,
-          playing: playing,
-          fit: boxFit,
-          still: _SlideImage(file: display, thumbnail: thumbnail, fit: boxFit),
-        ),
+        display,
+        thumbnail,
+        profile,
       );
     }
     final foreground = _KenBurns(
@@ -492,6 +560,15 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> {
       progress: progress,
       child: _SlideImage(file: display, thumbnail: thumbnail, fit: boxFit),
     );
+    return _adaptiveBackground(foreground, display, thumbnail, profile);
+  }
+
+  Widget _adaptiveBackground(
+    Widget foreground,
+    File display,
+    File? thumbnail,
+    AspectProfile profile,
+  ) {
     final sigma = switch (profile.adaptiveBackground) {
       AdaptiveBackground.none => null,
       AdaptiveBackground.ambientGlow => 40.0,
@@ -1033,9 +1110,8 @@ class _KenBurnsState extends State<_KenBurns>
     _detachListener();
     _resolvedAspect = null;
     try {
-      final stream = FileImage(
-        widget.imageFile,
-      ).resolve(ImageConfiguration.empty);
+      final stream = FileImage(widget.imageFile)
+          .resolve(ImageConfiguration.empty);
       final listener = ImageStreamListener(
         (info, synchronousCall) {
           final aspect = info.image.width / info.image.height;
@@ -1095,9 +1171,10 @@ class _KenBurnsState extends State<_KenBurns>
       return;
     }
     final remaining = (1 - widget.progress.clamp(0.0, 1.0)).clamp(0.05, 1.0);
-    final millis = (widget.intervalSeconds * 1000 * remaining)
-        .round()
-        .clamp(500, 300000);
+    final millis = (widget.intervalSeconds * 1000 * remaining).round().clamp(
+      500,
+      300000,
+    );
     _controller
       ..duration = Duration(milliseconds: millis)
       ..value = 0

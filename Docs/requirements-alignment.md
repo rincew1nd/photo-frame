@@ -68,7 +68,8 @@ The product uses original files wherever the bundled decoders support them.
 
 ## 4. Plugins
 
-The plugin system is implemented as described in [`plugins.md`](plugins.md).
+The plugin system is specified in [`plugins.md`](plugins.md). Phase 4 has not started, so it is not
+implemented or verified.
 
 ### Resolved open questions from REQUIREMENTS.md
 
@@ -79,7 +80,10 @@ The plugin system is implemented as described in [`plugins.md`](plugins.md).
 | Signatures/checksums required | No signatures in v1; explicit install + permission consent; record SHA-256 |
 | Plugins outside the slideshow | Slideshow only in v1 |
 | Bundle/memory/CPU/instance limits | 20 MB ZIP, 100 MB extracted, 500 files, 20 installed, 10 active, API v1 (see `plugins.md`) |
-| Replace built-in overlays with plugins | Built-in clock/weather/metadata remain; reference plugins are additional |
+| Replace built-in overlays with plugins | All overlays are bundled plugins; clock/weather/metadata are enabled by default and migrated from the compiled overlay settings |
+| Plugin format | Sandboxed HTML/CSS/JS in the plugin webview; Dart is not loaded at runtime |
+| Plugin placement | Drag-and-drop and resize with optional grid snap/grid size in the Plugins screen |
+| Plugin settings | Each installed plugin has its own schema-rendered settings screen |
 | Plugin write access to playback | Yes, declared actions, user-granted, rate-limited |
 | Network domain allowlist | No allowlist in v1; network is host-proxied and permission-gated |
 
@@ -124,14 +128,16 @@ The plugin system is implemented as described in [`plugins.md`](plugins.md).
 - NFR-02: plugin updates at 1 Hz must not cause visible slideshow frame drops. Use per-instance
   small webviews, coalesced state, low OSR frame rate, and no plugin work on the media path.
 - NFR-03: 72-hour soak tests on Windows, Linux, and Android; bounded caches; watchdog restarts.
-- NFR-07: plugins degrade when WebView is unavailable or below baseline; built-in overlays continue.
+- NFR-07: plugins degrade when WebView is unavailable or below baseline; because all overlays are
+  plugins, the slideshow continues without overlays on those devices.
 - NFR-09: plugins never call Immich directly; the host snapshot is the only data source.
 
 ## 8. Settings and UI
 
 - Settings groups and summaries follow SET-01..SET-09.
 - Per-aspect profiles and filters live in the designated group.
-- Plugin management, permissions, screenshots, and descriptions live in Overlays & Plugins.
+- Plugin management, per-plugin settings, permissions, icons/screenshots, and placement live in the
+  Plugins group. Clock, weather, and metadata are managed there as bundled plugins.
 - Settings changes apply without restart.
 - Onboarding tour targets survive the new groups.
 - Search (SET-08) remains MAY; not required for v1.

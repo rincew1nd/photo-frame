@@ -16,6 +16,7 @@ import 'package:photoframe/data/weather/weather_service.dart';
 import 'package:photoframe/domain/media/ken_burns.dart';
 import 'package:photoframe/features/slideshow/slideshow_controller.dart';
 import 'package:photoframe/features/slideshow/slideshow_screen.dart';
+import 'package:photoframe/platform/services.dart';
 
 import '../support/fake_media_playback.dart';
 
@@ -59,6 +60,15 @@ class _FakeSlideshowController extends SlideshowController {
   @override
   void advanceIfCurrent(String assetId) {
     advanceCalls++;
+  }
+}
+
+class _FakeBrightness implements BrightnessService {
+  final List<double?> values = <double?>[];
+
+  @override
+  Future<void> setWindowBrightness(double? brightness) async {
+    values.add(brightness);
   }
 }
 
@@ -203,6 +213,7 @@ Future<_FakeSlideshowController> _pump(
   AppSettings? settings,
   InMemorySettingsRepository? repository,
   bool preload = false,
+  BrightnessService? brightness,
   List<Override> overrides = const <Override>[],
 }) async {
   await tester.binding.setSurfaceSize(size);
@@ -219,6 +230,9 @@ Future<_FakeSlideshowController> _pump(
           repository ?? InMemorySettingsRepository(settings ?? _settings()),
         ),
         preloadMediaProvider.overrideWithValue(preload),
+        brightnessServiceProvider.overrideWithValue(
+          brightness ?? const UnsupportedBrightness(),
+        ),
         ...overrides,
       ],
       child: const MaterialApp(home: SlideshowScreen()),
@@ -366,23 +380,26 @@ void main() {
     expect(displayFileFor(asset)!.path, derived.path);
   });
 
-  test('displayFileFor falls back to the thumbnail for a missing derived image', () {
-    final dir = _tempDir();
-    final original = File('${dir.path}/photo.heic')
-      ..writeAsBytesSync(<int>[0, 1, 2]);
-    final thumbnail = _image(dir, 'thumb');
-    final asset = CachedAsset(
-      id: 'heic-derived-missing',
-      originalMimeType: 'image/heic',
-      originalPath: original.path,
-      thumbnailPath: thumbnail.path,
-      derivedImagePath: '${dir.path}/missing-derived.png',
-      cachedAt: DateTime.utc(2026),
-      lastAccessedAt: DateTime.utc(2026),
-    );
+  test(
+    'displayFileFor falls back to the thumbnail for a missing derived image',
+    () {
+      final dir = _tempDir();
+      final original = File('${dir.path}/photo.heic')
+        ..writeAsBytesSync(<int>[0, 1, 2]);
+      final thumbnail = _image(dir, 'thumb');
+      final asset = CachedAsset(
+        id: 'heic-derived-missing',
+        originalMimeType: 'image/heic',
+        originalPath: original.path,
+        thumbnailPath: thumbnail.path,
+        derivedImagePath: '${dir.path}/missing-derived.png',
+        cachedAt: DateTime.utc(2026),
+        lastAccessedAt: DateTime.utc(2026),
+      );
 
-    expect(displayFileFor(asset)?.path, thumbnail.path);
-  });
+      expect(displayFileFor(asset)?.path, thumbnail.path);
+    },
+  );
 
   testWidgets(
     'unsupported original without a preview shows the no-cache state',
@@ -466,40 +483,39 @@ void main() {
     expect(find.byKey(const ValueKey<String>('ken-burns-frame')), findsNothing);
   });
 
-  testWidgets('full video mode renders the player and hides the preview label', (
-    tester,
-  ) async {
-    final dir = _tempDir();
-    final thumbnail = _image(dir, 'video-thumb');
-    final videoFile = File('${dir.path}/video.mp4')
-      ..writeAsBytesSync(<int>[0, 1, 2, 3]);
-    final fake = FakeMediaPlayback();
-    addTearDown(fake.dispose);
-    final controller = await _pump(
-      tester,
-      _fullVideoState(videoFile: videoFile, thumbnail: thumbnail),
-      repository: InMemorySettingsRepository(
-        const AppSettings(
-          overlays: OverlaySettings(clock: false),
-          defaultProfile: AspectProfile(imageMotion: false),
-          playback: PlaybackSettings(
-            videoPlaybackMode: VideoPlaybackMode.full,
+  testWidgets(
+    'full video mode renders the player and hides the preview label',
+    (tester) async {
+      final dir = _tempDir();
+      final thumbnail = _image(dir, 'video-thumb');
+      final videoFile = File('${dir.path}/video.mp4')
+        ..writeAsBytesSync(<int>[0, 1, 2, 3]);
+      final fake = FakeMediaPlayback();
+      addTearDown(fake.dispose);
+      final controller = await _pump(
+        tester,
+        _fullVideoState(videoFile: videoFile, thumbnail: thumbnail),
+        repository: InMemorySettingsRepository(
+          const AppSettings(
+            overlays: OverlaySettings(clock: false),
+            defaultProfile: AspectProfile(imageMotion: false),
+            playback: PlaybackSettings(
+              videoPlaybackMode: VideoPlaybackMode.full,
+            ),
           ),
         ),
-      ),
-      overrides: [
-        mediaPlaybackFactoryProvider.overrideWithValue(() => fake),
-      ],
-    );
+        overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
+      );
 
-    expect(find.text('fake-video'), findsOneWidget);
-    expect(find.text('Video preview'), findsNothing);
+      expect(find.text('fake-video'), findsOneWidget);
+      expect(find.text('Video preview'), findsNothing);
 
-    fake.emit(const PlaybackSnapshot(phase: PlaybackPhase.completed));
-    await tester.pump();
+      fake.emit(const PlaybackSnapshot(phase: PlaybackPhase.completed));
+      await tester.pump();
 
-    expect(controller.advanceCalls, 1);
-  });
+      expect(controller.advanceCalls, 1);
+    },
+  );
 
   testWidgets('full video mode pans the video in cover mode', (tester) async {
     final dir = _tempDir();
@@ -584,9 +600,7 @@ void main() {
       tester,
       _fullVideoState(videoFile: videoFile, thumbnail: thumbnail),
       repository: repository,
-      overrides: [
-        mediaPlaybackFactoryProvider.overrideWithValue(() => fake),
-      ],
+      overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
     );
 
     await tester.tapAt(const Offset(400, 300));
@@ -633,12 +647,17 @@ void main() {
     tester,
   ) async {
     final dir = _tempDir();
-    final first = (await tester.runAsync(() => _sizedImage(dir, 'first', 1600, 900)))!;
+    final first = (await tester.runAsync(
+      () => _sizedImage(dir, 'first', 1600, 900),
+    ))!;
     await tester.binding.setSurfaceSize(const Size(800, 600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          brightnessServiceProvider.overrideWithValue(
+            const UnsupportedBrightness(),
+          ),
           slideshowControllerProvider.overrideWith(
             () => _FakeSlideshowController(
               SlideshowViewState(
@@ -680,12 +699,17 @@ void main() {
 
   testWidgets('pan uses an image box wider than the viewport', (tester) async {
     final dir = _tempDir();
-    final first = (await tester.runAsync(() => _sizedImage(dir, 'wide', 3000, 1000)))!;
+    final first = (await tester.runAsync(
+      () => _sizedImage(dir, 'wide', 3000, 1000),
+    ))!;
     await tester.binding.setSurfaceSize(const Size(800, 600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          brightnessServiceProvider.overrideWithValue(
+            const UnsupportedBrightness(),
+          ),
           slideshowControllerProvider.overrideWith(
             () => _FakeSlideshowController(
               SlideshowViewState(
@@ -735,12 +759,17 @@ void main() {
     tester,
   ) async {
     final dir = _tempDir();
-    final first = (await tester.runAsync(() => _sizedImage(dir, 'first', 900, 1600)))!;
+    final first = (await tester.runAsync(
+      () => _sizedImage(dir, 'first', 900, 1600),
+    ))!;
     await tester.binding.setSurfaceSize(const Size(800, 600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          brightnessServiceProvider.overrideWithValue(
+            const UnsupportedBrightness(),
+          ),
           slideshowControllerProvider.overrideWith(
             () => _FakeSlideshowController(
               SlideshowViewState(
@@ -784,12 +813,17 @@ void main() {
     tester,
   ) async {
     final dir = _tempDir();
-    final first = (await tester.runAsync(() => _sizedImage(dir, 'first', 1600, 1200)))!;
+    final first = (await tester.runAsync(
+      () => _sizedImage(dir, 'first', 1600, 1200),
+    ))!;
     await tester.binding.setSurfaceSize(const Size(800, 600));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          brightnessServiceProvider.overrideWithValue(
+            const UnsupportedBrightness(),
+          ),
           slideshowControllerProvider.overrideWith(
             () => _FakeSlideshowController(
               SlideshowViewState(
@@ -976,6 +1010,48 @@ void main() {
     expect(fake.openedSource?.uri, motion.path);
   });
 
+  testWidgets(
+    'live photo with contain and ambient glow renders a filtered background',
+    (tester) async {
+      final dir = _tempDir();
+      final still = _image(dir, 'live-glow');
+      final motion = File('${dir.path}/motion.mov')
+        ..writeAsBytesSync(<int>[0, 1, 2]);
+      final fake = FakeMediaPlayback();
+      addTearDown(fake.dispose);
+      await _pump(
+        tester,
+        SlideshowViewState(
+          assets: const <ImmichAsset>[
+            ImmichAsset(id: 'lp3', type: MediaKind.livePhoto),
+          ],
+          current: const ImmichAsset(id: 'lp3', type: MediaKind.livePhoto),
+          playing: true,
+          loading: false,
+          cached: <CachedAsset>[
+            _cached(
+              'lp3',
+              still,
+            ).copyWith(type: MediaKind.livePhoto, liveVideoPath: motion.path),
+          ],
+        ),
+        settings: const AppSettings(
+          overlays: OverlaySettings(clock: false),
+          defaultProfile: AspectProfile(
+            fit: ImageFit.contain,
+            imageMotion: false,
+            adaptiveBackground: AdaptiveBackground.ambientGlow,
+          ),
+          playback: PlaybackSettings(livePhotoMode: LivePhotoMode.loop),
+        ),
+        overrides: [mediaPlaybackFactoryProvider.overrideWithValue(() => fake)],
+      );
+
+      expect(find.byType(ImageFiltered), findsOneWidget);
+      expect(find.text('fake-video'), findsOneWidget);
+    },
+  );
+
   testWidgets('live photo loop pans the still in cover mode', (tester) async {
     final dir = _tempDir();
     final still = (await tester.runAsync(
@@ -1028,7 +1104,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('shows the still when the live photo mode is off', (tester) async {
+  testWidgets('shows the still when the live photo mode is off', (
+    tester,
+  ) async {
     final dir = _tempDir();
     final first = _image(dir, 'live');
     final motion = File('${dir.path}/motion.mov')
@@ -1111,7 +1189,9 @@ void main() {
     expect(fakes.last.openedSource?.uri, motion.path);
   });
 
-  testWidgets('live photo plays once then returns to the still', (tester) async {
+  testWidgets('live photo plays once then returns to the still', (
+    tester,
+  ) async {
     final dir = _tempDir();
     final first = _image(dir, 'live');
     final motion = File('${dir.path}/motion.mov')
@@ -1183,10 +1263,10 @@ void main() {
         loading: false,
         cached: <CachedAsset>[
           _cached('p1', first),
-          _cached('lp2', still).copyWith(
-            type: MediaKind.livePhoto,
-            liveVideoPath: motion.path,
-          ),
+          _cached(
+            'lp2',
+            still,
+          ).copyWith(type: MediaKind.livePhoto, liveVideoPath: motion.path),
         ],
       ),
       preload: true,
@@ -1212,6 +1292,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          brightnessServiceProvider.overrideWithValue(
+            const UnsupportedBrightness(),
+          ),
           slideshowControllerProvider.overrideWith(() {
             controller = _FakeSlideshowController(
               SlideshowViewState(
@@ -1292,5 +1375,34 @@ void main() {
     );
 
     expect(find.byType(ImageFiltered), findsOneWidget);
+  });
+
+  testWidgets('applies night brightness and restores it on dispose', (
+    tester,
+  ) async {
+    final dir = _tempDir();
+    final first = _image(dir, 'night');
+    final brightness = _FakeBrightness();
+    await _pump(
+      tester,
+      SlideshowViewState(
+        assets: const <ImmichAsset>[ImmichAsset(id: 'n1')],
+        current: const ImmichAsset(id: 'n1'),
+        nightMode: true,
+        loading: false,
+        cached: <CachedAsset>[_cached('n1', first)],
+      ),
+      settings: const AppSettings(
+        overlays: OverlaySettings(clock: false),
+        defaultProfile: AspectProfile(imageMotion: false),
+        nightMode: NightModeSettings(enabled: true, dimOpacity: 0.8),
+      ),
+      brightness: brightness,
+    );
+
+    expect(brightness.values.first, closeTo(0.2, 1e-9));
+
+    await tester.pumpWidget(const SizedBox());
+    expect(brightness.values.last, isNull);
   });
 }

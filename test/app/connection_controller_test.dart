@@ -63,6 +63,10 @@ void main() {
         fullscreen: const UnsupportedFullscreen(),
         biometrics: _NoopBiometrics(),
         singleInstance: _NoopSingleInstance(),
+        autostart: const UnsupportedAutostart(),
+        permissions: const UnsupportedPermissions(),
+        kiosk: const UnsupportedKiosk(),
+        brightness: const UnsupportedBrightness(),
         livePhotoBounce: const PlatformLivePhotoBounceSupport(),
       ),
     );
@@ -116,9 +120,9 @@ void main() {
       'test-key',
     );
 
-    final state = container.read(
-      conn.connectionControllerProvider,
-    ).requireValue;
+    final state = container
+        .read(conn.connectionControllerProvider)
+        .requireValue;
     expect(report?.canConnect, isTrue);
     expect(state.isConnected, isTrue);
     expect(state.settings.connection.serverUrl, server.apiUrl.toString());
@@ -135,9 +139,7 @@ void main() {
     );
     await controller.connectWithApiKey(server.rootUrl.toString(), 'test-key');
     await controller.refreshAlbums();
-    var state = container.read(
-      conn.connectionControllerProvider,
-    ).requireValue;
+    var state = container.read(conn.connectionControllerProvider).requireValue;
     expect(state.albums, hasLength(2));
     expect(state.failure, isNull);
 
@@ -156,9 +158,9 @@ void main() {
     await controller.saveAlbumSelection(<String>{'album-1', 'album-2'});
 
     final stored = await bootstrap.settings.load();
-    final state = container.read(
-      conn.connectionControllerProvider,
-    ).requireValue;
+    final state = container
+        .read(conn.connectionControllerProvider)
+        .requireValue;
     expect(stored.connection.albumIds, <String>{'album-1', 'album-2'});
     expect(state.selectedAlbumIds, <String>{'album-1', 'album-2'});
   });
@@ -170,9 +172,9 @@ void main() {
     await controller.connectWithApiKey(server.rootUrl.toString(), 'test-key');
     await controller.disconnect();
 
-    final state = container.read(
-      conn.connectionControllerProvider,
-    ).requireValue;
+    final state = container
+        .read(conn.connectionControllerProvider)
+        .requireValue;
     expect(await bootstrap.secure.read(SecretKeys.immichApiKey), isNull);
     expect(await bootstrap.secure.read(SecretKeys.immichAccessToken), isNull);
     expect((await bootstrap.settings.load()).connection.serverUrl, isNull);

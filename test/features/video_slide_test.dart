@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photoframe/app/providers.dart';
 import 'package:photoframe/data/media/playback.dart';
 import 'package:photoframe/features/slideshow/video_slide.dart';
+import 'package:photoframe/platform/services.dart';
 
+import '../support/fake_audio_focus.dart';
 import '../support/fake_media_playback.dart';
 
 Future<void> _pump(
   WidgetTester tester,
   FakeMediaPlayback fake,
-  VideoSlide slide,
-) async {
+  VideoSlide slide, {
+  List<Override> overrides = const [],
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         mediaPlaybackFactoryProvider.overrideWithValue(() => fake),
+        ...overrides,
       ],
       child: MaterialApp(home: Scaffold(body: slide)),
     ),
@@ -398,5 +403,95 @@ void main() {
 
     await tester.pumpWidget(const SizedBox());
     expect(fake.disposed, isTrue);
+  });
+
+  testWidgets('transient audio focus loss pauses and gain resumes once', (
+    tester,
+  ) async {
+    final fake = FakeMediaPlayback();
+    final focus = FakeAudioFocus();
+    addTearDown(fake.dispose);
+    addTearDown(focus.dispose);
+
+    await _pump(
+      tester,
+      fake,
+      _slide(muted: false, playing: true),
+      overrides: [audioFocusServiceProvider.overrideWithValue(focus)],
+    );
+    await tester.pump();
+
+    expect(focus.requestCount, 1);
+
+    focus.emit(AudioFocusEvent.transient);
+    await tester.pump();
+    await tester.pump();
+    expect(fake.pauseCalls, 1);
+    expect(fake.playing, isFalse);
+
+    focus.emit(AudioFocusEvent.gain);
+    await tester.pump();
+    await tester.pump();
+    expect(fake.playing, isTrue);
+    expect(fake.playCalls, 1);
+  });
+
+  testWidgets('muted playback avoids focus until unmuted, then abandons', (
+    tester,
+  ) async {
+    final fake = FakeMediaPlayback();
+    final focus = FakeAudioFocus();
+    addTearDown(fake.dispose);
+    addTearDown(focus.dispose);
+
+    await _pump(
+      tester,
+      fake,
+      _slide(muted: true, playing: true),
+      overrides: [audioFocusServiceProvider.overrideWithValue(focus)],
+    );
+    await tester.pump();
+    expect(focus.requestCount, 0);
+
+    await _pump(
+      tester,
+      fake,
+      _slide(muted: false, playing: true),
+      overrides: [audioFocusServiceProvider.overrideWithValue(focus)],
+    );
+    await tester.pump();
+    expect(focus.requestCount, 1);
+
+    await tester.pumpWidget(const SizedBox());
+    expect(focus.abandonCount, 1);
+  });
+
+  testWidgets('permanent audio focus loss pauses and does not resume', (
+    tester,
+  ) async {
+    final fake = FakeMediaPlayback();
+    final focus = FakeAudioFocus();
+    addTearDown(fake.dispose);
+    addTearDown(focus.dispose);
+
+    await _pump(
+      tester,
+      fake,
+      _slide(muted: false, playing: true),
+      overrides: [audioFocusServiceProvider.overrideWithValue(focus)],
+    );
+    await tester.pump();
+
+    focus.emit(AudioFocusEvent.lost);
+    await tester.pump();
+    await tester.pump();
+    expect(fake.pauseCalls, 1);
+    expect(fake.playing, isFalse);
+
+    focus.emit(AudioFocusEvent.gain);
+    await tester.pump();
+    await tester.pump();
+    expect(fake.playing, isFalse);
+    expect(fake.playCalls, 0);
   });
 }

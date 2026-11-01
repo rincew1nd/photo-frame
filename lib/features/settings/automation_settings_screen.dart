@@ -1,14 +1,74 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photoframe/app/providers.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/features/settings/settings_scaffold.dart';
 
-class AutomationSettingsScreen extends ConsumerWidget {
+class AutomationSettingsScreen extends ConsumerStatefulWidget {
   const AutomationSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AutomationSettingsScreen> createState() =>
+      _AutomationSettingsScreenState();
+}
+
+class _AutomationSettingsScreenState
+    extends ConsumerState<AutomationSettingsScreen>
+    with WidgetsBindingObserver {
+  bool? _batteryIgnored;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _loadBatteryStatus();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadBatteryStatus();
+    }
+  }
+
+  Future<void> _loadBatteryStatus() async {
+    final ignored = await ref
+        .read(permissionsServiceProvider)
+        .batteryOptimizationIgnored;
+    if (!mounted) {
+      return;
+    }
+    setState(() => _batteryIgnored = ignored);
+    if (Platform.isAndroid &&
+        ignored == false &&
+        ref.read(settingsControllerProvider).value?.automation.startOnBoot ==
+            true) {
+      _save(
+        ref,
+        (current) => current.copyWith(
+          automation: current.automation.copyWith(startOnBoot: false),
+        ),
+      );
+    }
+  }
+
+  Future<void> _grantBatteryExemption() async {
+    await ref
+        .read(permissionsServiceProvider)
+        .requestBatteryOptimizationExemption();
+    await _loadBatteryStatus();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final asyncSettings = ref.watch(settingsControllerProvider);
     return SettingsScaffold(
       title: 'Automation',
@@ -16,22 +76,83 @@ class AutomationSettingsScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stackTrace) =>
             const Center(child: Text('Unable to load settings')),
-        data: (settings) => _body(context, ref, settings),
+        data: (settings) => _body(context, settings),
       ),
     );
   }
 
-  Widget _body(BuildContext context, WidgetRef ref, AppSettings settings) {
+  Widget _body(BuildContext context, AppSettings settings) {
     final automation = settings.automation;
     final night = settings.nightMode;
+    final autostartSupported =
+        ref.watch(autostartSupportProvider).value ?? false;
+    final batteryExempt = !Platform.isAndroid || _batteryIgnored == true;
+    final batteryKnown = !Platform.isAndroid || _batteryIgnored != null;
+    final canToggleAutostart =
+        autostartSupported &&
+        batteryKnown &&
+        (batteryExempt || automation.startOnBoot);
     return ListView(
       children: <Widget>[
         SwitchListTile(
           title: const Text('Start on boot'),
-          subtitle: const Text('Not available yet.'),
+          subtitle: Text(
+            !autostartSupported
+                ? 'Not supported on this device.'
+                : Platform.isAndroid && _batteryIgnored != true
+                ? 'Battery optimization exemption is required.'
+                : 'Starts the slideshow after reboot.',
+          ),
           value: automation.startOnBoot,
-          onChanged: null,
+          onChanged: canToggleAutostart
+              ? (value) => _save(
+                  ref,
+                  (current) => current.copyWith(
+                    automation: current.automation.copyWith(startOnBoot: value),
+                  ),
+                )
+              : null,
         ),
+        if (Platform.isAndroid) ...[
+          ListTile(
+            title: const Text('Battery optimization'),
+            subtitle: Text(
+              _batteryIgnored == null
+                  ? 'Checking status.'
+                  : _batteryIgnored!
+                  ? 'Exempt from battery optimization.'
+                  : 'Battery optimization may stop the slideshow.',
+            ),
+            trailing: _batteryIgnored == true
+                ? const Icon(Icons.check)
+                : TextButton(
+                    onPressed: _grantBatteryExemption,
+                    child: const Text('Grant'),
+                  ),
+          ),
+          ListTile(
+            title: const Text('OEM autostart'),
+            subtitle: const Text(
+              'Some manufacturers require a separate autostart permission.',
+            ),
+            trailing: TextButton(
+              onPressed: () =>
+                  ref.read(permissionsServiceProvider).openAutostartSettings(),
+              child: const Text('Open'),
+            ),
+          ),
+          ListTile(
+            title: const Text('Home app'),
+            subtitle: const Text(
+              'Choose Photo Frame as the home app to start it with the Home button.',
+            ),
+            trailing: TextButton(
+              onPressed: () =>
+                  ref.read(permissionsServiceProvider).openHomeSettings(),
+              child: const Text('Open'),
+            ),
+          ),
+        ],
         SwitchListTile(
           title: const Text('Fullscreen'),
           value: automation.fullscreen,
@@ -42,6 +163,23 @@ class AutomationSettingsScreen extends ConsumerWidget {
             ),
           ),
         ),
+        if (Platform.isWindows || Platform.isLinux)
+          SwitchListTile(
+            title: const Text('Kiosk mode'),
+            subtitle: const Text(
+              'Hides the window controls and keeps the frame on top.',
+            ),
+            value: automation.kiosk,
+            onChanged: (value) => _save(
+              ref,
+              (current) => current.copyWith(
+                automation: current.automation.copyWith(
+                  kiosk: value,
+                  fullscreen: value ? true : current.automation.fullscreen,
+                ),
+              ),
+            ),
+          ),
         SwitchListTile(
           title: const Text('Keep screen on'),
           value: settings.display.keepScreenOn,
@@ -57,10 +195,8 @@ class AutomationSettingsScreen extends ConsumerWidget {
           key: const ValueKey<String>('night-mode-enabled'),
           title: const Text('Enable night mode'),
           value: night.enabled,
-          onChanged: (value) => _saveNight(
-            ref,
-            (night) => night.copyWith(enabled: value),
-          ),
+          onChanged: (value) =>
+              _saveNight(ref, (night) => night.copyWith(enabled: value)),
         ),
         ListTile(
           title: const Text('Start time'),
@@ -82,26 +218,20 @@ class AutomationSettingsScreen extends ConsumerWidget {
           max: 1,
           divisions: 8,
           label: '${(night.dimOpacity * 100).round()}%',
-          onChanged: (value) => _saveNight(
-            ref,
-            (night) => night.copyWith(dimOpacity: value),
-          ),
+          onChanged: (value) =>
+              _saveNight(ref, (night) => night.copyWith(dimOpacity: value)),
         ),
         SwitchListTile(
           title: const Text('Pause slideshow'),
           value: night.pauseSlideshow,
-          onChanged: (value) => _saveNight(
-            ref,
-            (night) => night.copyWith(pauseSlideshow: value),
-          ),
+          onChanged: (value) =>
+              _saveNight(ref, (night) => night.copyWith(pauseSlideshow: value)),
         ),
         SwitchListTile(
           title: const Text('Hide overlays'),
           value: night.hideOverlays,
-          onChanged: (value) => _saveNight(
-            ref,
-            (night) => night.copyWith(hideOverlays: value),
-          ),
+          onChanged: (value) =>
+              _saveNight(ref, (night) => night.copyWith(hideOverlays: value)),
         ),
         if (night.startMinutes > night.endMinutes)
           const ListTile(

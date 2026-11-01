@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:photoframe/app/providers.dart';
 import 'package:photoframe/data/media/playback.dart';
+import 'package:photoframe/platform/services.dart';
 
 /// Full video playback for a single slide.
 class VideoSlide extends ConsumerStatefulWidget {
@@ -29,6 +30,7 @@ class VideoSlide extends ConsumerStatefulWidget {
   final BoxFit fit;
   final Widget fallback;
   final bool loop;
+
   /// Plays forward then backward while the slide is visible.
   final bool bounce;
   final VoidCallback? onCompleted;
@@ -51,10 +53,16 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
   bool _preloaded = false;
   bool _reverse = false;
   bool _bouncing = false;
+  late final AudioFocusService _audioFocus;
+  StreamSubscription<AudioFocusEvent>? _focusSubscription;
+  bool _hasFocus = false;
+  bool _resumeAfterFocusGain = false;
 
   @override
   void initState() {
     super.initState();
+    _audioFocus = ref.read(audioFocusServiceProvider);
+    _focusSubscription = _audioFocus.events.listen(_onAudioFocus);
     // Defer player creation until after the first frame so the still/fallback
     // renders immediately instead of waiting on media_kit startup.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -72,7 +80,58 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     _reverse = false;
     await playback.setMuted(widget.muted);
     if (widget.playing) {
+      await _ensureAudioFocus();
       await playback.play();
+    }
+  }
+
+  Future<void> _ensureAudioFocus() async {
+    if (widget.muted || !widget.playing || _hasFocus) {
+      return;
+    }
+    _hasFocus = await _audioFocus.request();
+  }
+
+  void _releaseAudioFocus() {
+    if (!_hasFocus) {
+      return;
+    }
+    _hasFocus = false;
+    unawaited(_audioFocus.abandon());
+  }
+
+  void _onAudioFocus(AudioFocusEvent event) {
+    final playback = _playback;
+    switch (event) {
+      case AudioFocusEvent.transient:
+        if (!_hasFocus) {
+          return;
+        }
+        _resumeAfterFocusGain = widget.playing;
+        if (playback != null) {
+          unawaited(playback.pause());
+        }
+      case AudioFocusEvent.lost:
+        if (!_hasFocus) {
+          _resumeAfterFocusGain = false;
+          return;
+        }
+        _hasFocus = false;
+        _resumeAfterFocusGain = false;
+        if (playback != null) {
+          unawaited(playback.pause());
+        }
+      case AudioFocusEvent.gain:
+        if (!_hasFocus) {
+          _resumeAfterFocusGain = false;
+          return;
+        }
+        if (_resumeAfterFocusGain && widget.playing && !widget.muted) {
+          _resumeAfterFocusGain = false;
+          if (playback != null) {
+            unawaited(playback.play());
+          }
+        }
     }
   }
 
@@ -99,6 +158,7 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     _errorNotified = false;
     _fallbackAttempted = false;
     _reverse = false;
+    await _ensureAudioFocus();
     try {
       await playback.open(
         source,
@@ -145,6 +205,7 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
           return;
         }
         _errorNotified = true;
+        _releaseAudioFocus();
         widget.onError?.call(snapshot.error ?? 'Playback failed');
       }
     }
@@ -166,6 +227,7 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     }
     if (source == null) {
       _errorNotified = true;
+      _releaseAudioFocus();
       widget.onError?.call(error);
       return;
     }
@@ -226,6 +288,28 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     }
   }
 
+  Future<void> _applyPlaybackChanges(
+    MediaPlayback playback,
+    VideoSlide oldWidget,
+  ) async {
+    if (oldWidget.muted != widget.muted) {
+      await playback.setMuted(widget.muted);
+    }
+    if (widget.playing && !widget.muted) {
+      await _ensureAudioFocus();
+    } else {
+      _resumeAfterFocusGain = false;
+      _releaseAudioFocus();
+    }
+    if (oldWidget.playing != widget.playing) {
+      if (widget.playing) {
+        await playback.play();
+      } else {
+        await playback.pause();
+      }
+    }
+  }
+
   @override
   void didUpdateWidget(VideoSlide oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -233,24 +317,28 @@ class _VideoSlideState extends ConsumerState<VideoSlide> {
     if (playback == null) {
       return;
     }
-    if (oldWidget.muted != widget.muted) {
-      unawaited(playback.setMuted(widget.muted));
-    }
-    if (oldWidget.playing != widget.playing) {
-      unawaited(widget.playing ? playback.play() : playback.pause());
+    if (oldWidget.muted != widget.muted ||
+        oldWidget.playing != widget.playing) {
+      unawaited(_applyPlaybackChanges(playback, oldWidget));
     }
   }
 
   @override
   void dispose() {
     final subscription = _subscription;
+    final focusSubscription = _focusSubscription;
     final playback = _playback;
     _subscription = null;
+    _focusSubscription = null;
     _playback = null;
     _reverse = false;
     if (subscription != null) {
       unawaited(subscription.cancel());
     }
+    if (focusSubscription != null) {
+      unawaited(focusSubscription.cancel());
+    }
+    _releaseAudioFocus();
     if (playback != null) {
       unawaited(playback.dispose());
     }

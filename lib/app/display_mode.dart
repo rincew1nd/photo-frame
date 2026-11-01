@@ -16,6 +16,8 @@ class DisplayModeController extends ConsumerStatefulWidget {
 class _DisplayModeControllerState extends ConsumerState<DisplayModeController> {
   bool? _fullscreen;
   bool? _keepAwake;
+  bool? _startOnBoot;
+  bool _kiosk = false;
 
   @override
   void initState() {
@@ -37,13 +39,27 @@ class _DisplayModeControllerState extends ConsumerState<DisplayModeController> {
       return;
     }
     final platform = ref.read(platformServicesProvider);
-    if (_fullscreen != value.automation.fullscreen) {
-      _fullscreen = value.automation.fullscreen;
+    final effectiveFullscreen =
+        value.automation.fullscreen || value.automation.kiosk;
+    if (_fullscreen != effectiveFullscreen) {
+      _fullscreen = effectiveFullscreen;
       try {
-        if (value.automation.fullscreen) {
+        if (effectiveFullscreen) {
           await platform.fullscreen.enable();
         } else {
           await platform.fullscreen.disable();
+        }
+      } on Object {
+        // Ignore a missing platform plugin instead of crashing the app.
+      }
+    }
+    if (_kiosk != value.automation.kiosk) {
+      _kiosk = value.automation.kiosk;
+      try {
+        if (value.automation.kiosk) {
+          await platform.kiosk.enable();
+        } else {
+          await platform.kiosk.disable();
         }
       } on Object {
         // Ignore a missing platform plugin instead of crashing the app.
@@ -57,6 +73,14 @@ class _DisplayModeControllerState extends ConsumerState<DisplayModeController> {
         } else {
           await platform.keepAwake.disable();
         }
+      } on Object {
+        // Ignore a missing platform plugin instead of crashing the app.
+      }
+    }
+    if (_startOnBoot != value.automation.startOnBoot) {
+      _startOnBoot = value.automation.startOnBoot;
+      try {
+        await platform.autostart.setEnabled(value.automation.startOnBoot);
       } on Object {
         // Ignore a missing platform plugin instead of crashing the app.
       }

@@ -133,6 +133,10 @@ AppSettings migrate(Map<String, dynamic> json) {
     _migrateV1ToV2(data);
   }
 
+  if (parsedVersion < 3) {
+    _migrateV2ToV3(data);
+  }
+
   return AppSettings.fromJson(data);
 }
 
@@ -198,6 +202,15 @@ void _migrateV1ToV2(Map<String, dynamic> data) {
   automation.remove('kiosk');
   automation.remove('updateChecks');
   defaultProfile.remove('livePhotoMode');
+}
+
+void _migrateV2ToV3(Map<String, dynamic> data) {
+  data['schemaVersion'] = 3;
+
+  final automation = _section(data, 'automation');
+  automation.putIfAbsent('startOnBoot', () => false);
+  automation.putIfAbsent('kiosk', () => false);
+  automation.putIfAbsent('updateChecks', () => false);
 }
 
 Map<String, dynamic> _section(Map<String, dynamic> data, String key) {

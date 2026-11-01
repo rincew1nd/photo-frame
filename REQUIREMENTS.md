@@ -1,6 +1,6 @@
 # Photo Frame Requirements
 
-Status: Draft v0.2 (Phase 0 alignment applied)
+Status: Draft v0.4 (Phase 4 overlay/plugin decisions applied)
 Applies to: Photo Frame cross-platform photo frame (`com.rincew1nd.photoframe`)
 Related docs: [`Docs/README.md`](Docs/README.md), [`Docs/requirements-alignment.md`](Docs/requirements-alignment.md)
 
@@ -22,7 +22,7 @@ Priority keywords:
 | Platform | V1 status |
 |---|---|
 | Windows 10/11 x64 | Supported |
-| Linux x64 (Ubuntu/Debian) | Supported; X11 primary, Wayland validated in Phase 0/5 |
+| Linux x64 (Ubuntu/Debian) | Supported; X11 primary; Wayland unvalidated (no Linux host) |
 | Android 8.0+ (API 26) | Supported |
 | iOS, macOS | Out of scope |
 | Raspberry Pi / Linux ARM64 | Out of scope |
@@ -54,7 +54,7 @@ These capabilities already exist and must not regress.
 | BR-05 | Cache media for offline playback, prefetch the next slide, and continue the slideshow when the server is unreachable. | MUST |
 | BR-06 | Provide in-slideshow controls: previous, next, pause/resume, mute/unmute, album selection, media selection, and settings. | MUST |
 | BR-07 | Protect media/library navigation and API-key reveal/copy with biometric or device-credential authentication where a screen lock exists; fail open for navigation on devices without a lock. | MUST |
-| BR-08 | Render clock, current weather, and photo metadata overlays, each independently toggleable. | MUST |
+| BR-08 | Provide clock, current weather, and photo metadata overlays as bundled plugins, each independently enabled and configurable. | MUST |
 | BR-09 | Support night mode: dim to a configured brightness during a scheduled window, including overnight windows. | MUST |
 | BR-10 | Support start-on-boot, launcher mode (home replacement), and in-app update checks from GitHub releases. | MUST |
 | BR-11 | Persist all user settings across restarts and apply changes without reinstalling. | MUST |
@@ -127,21 +127,37 @@ These capabilities already exist and must not regress.
 
 ## 3. Modular Plugin System
 
+### 3.0 Implementation status (2026-11-01)
+
+Phase 4 is not started and is blocked on the Phase 0 transparent-overlay/WebView gate. The app
+currently ships clock, weather, and metadata overlays as compiled Flutter widgets and a Plugins
+settings placeholder; that implementation is the migration source, not the v1 target. The target is
+for every overlay — including clock, weather, and metadata — to be a plugin rendered by the host,
+with its own settings screen and draggable/resizable placement. There is no plugin bundle, manifest
+validation, registry, install/update UI, host page, bridge, sandbox, placement editor, plugin
+storage, or reference plugin yet. Settings and the cache database are schema v3 with no plugin state,
+and `Plugin API v1` is only advertised in diagnostics.
+
+Two snapshot gaps must be resolved in Phase 4: weather is fetched only when the current compiled
+weather overlay is enabled, and the cached `tags` field is always empty because sync never populates
+it. The current `OverlaySettings` switches and weather coordinates must migrate into the bundled
+weather plugin's configuration when the compiled overlays are removed.
+
 ### 3.1 Model and package format
 
 | ID | Requirement | Priority |
 |---|---|---|
 | PLG-01 | The app supports installable plugins that render HTML/CSS overlays and read application data. | MUST |
-| PLG-02 | A plugin is a self-contained bundle containing a JSON manifest, an HTML document, a CSS stylesheet, optional sandboxed script, and optional local assets. | MUST |
-| PLG-03 | The manifest declares at minimum: plugin ID, name, version, author, description, app/API compatibility, requested permissions, JSON settings schema, update triggers, optional actions, and default placement. | MUST |
-| PLG-04 | The manifest and settings schema are validated on install. Invalid, incompatible, or duplicate-ID plugins are rejected with a readable error. | MUST |
-| PLG-05 | Plugins are installed explicitly by the user. Installing a plugin must show its identity, version, and requested permissions before activation. | MUST |
+| PLG-02 | A plugin is a self-contained bundle containing a JSON manifest, an HTML document, a CSS stylesheet, optional sandboxed script, optional local assets, optional screenshots, and an optional icon. | MUST |
+| PLG-03 | The manifest declares at minimum: plugin ID, name, version, author, homepage/site, description, app/API compatibility, requested permissions, requested snapshot inputs, JSON settings schema, update triggers, optional actions, optional icon, and default placement. | MUST |
+| PLG-04 | The manifest, settings schema, inputs, icon, and screenshots are validated on install. Invalid, incompatible, or duplicate-ID plugins are rejected with a readable error. | MUST |
+| PLG-05 | Plugins are installed explicitly by the user. Installing a plugin must show its identity, version, icon, requested permissions, and requested inputs before activation. | MUST |
 
 ### 3.2 Lifecycle management
 
 | ID | Requirement | Priority |
 |---|---|---|
-| PLG-06 | The user can install, enable, disable, update, uninstall, and inspect installed plugins. | MUST |
+| PLG-06 | The user can install, enable, disable, update, uninstall, and inspect installed plugins. Each installed plugin has a dedicated settings screen reachable from the plugin list; its configuration, placement, permissions, and lifecycle controls live there. | MUST |
 | PLG-07 | Disabling or uninstalling a plugin removes its overlay immediately and frees its resources. | MUST |
 | PLG-08 | Uninstalling a plugin removes its plugin-scoped storage and configuration. | MUST |
 | PLG-09 | Updates preserve user configuration when the settings schema remains compatible; incompatible updates require confirmation. | SHOULD |
@@ -152,7 +168,7 @@ These capabilities already exist and must not regress.
 | ID | Requirement | Priority |
 |---|---|---|
 | PLG-11 | Plugins render in an overlay layer above the current photo/video but below app controls and dialogs. | MUST |
-| PLG-12 | Each plugin instance has a persisted position, size, and z-order. Position can use a 3x3 anchor (top/center/bottom x start/center/end) and MAY support free normalized coordinates. | MUST |
+| PLG-12 | Each plugin instance has a persisted position, size, and z-order. Placement uses free normalized coordinates with direct drag-and-drop movement and edge/corner resizing over the slideshow (edit mode) and from the plugin's settings screen; 3x3 anchors remain available as defaults. The Plugins screen provides an optional snap-to-grid toggle and a configurable grid size, both persisted. | MUST |
 | PLG-13 | Placement respects safe areas for display cutouts and system bars. | MUST |
 | PLG-14 | Each instance can be shown or hidden independently without uninstalling it. | MUST |
 | PLG-15 | Plugins are hidden during night mode by default; a per-instance "show during night mode" option MAY exist. | SHOULD |
@@ -168,7 +184,7 @@ the photo library, the API key, the server URL, or credentials.
 |---|---|---|
 | PLG-18 | **App data**: app version, plugin API version, locale, time zone, theme, viewport size, safe-area insets, night-mode state. | MUST |
 | PLG-19 | **Time data**: current epoch time, local time, date, time zone, and locale. | MUST |
-| PLG-20 | **Weather data**: current temperature, unit, weather code/description, and location label when weather is enabled and available; otherwise null. | MUST |
+| PLG-20 | **Weather data**: current temperature, unit, weather code/description, and location label when a plugin declares the weather input and weather is available; otherwise null. Weather is fetched by the host from the bundled weather plugin's location/unit settings, not only when a compiled-in overlay is enabled. | MUST |
 | PLG-21 | **Playback data**: playing/paused state, current index, total count, interval, elapsed progress, muted state, and slideshow-running state. | MUST |
 | PLG-22 | **Image data**: current asset ID, media type, Live Photo flag, dimensions, aspect bucket, MIME type, cached/offline state, EXIF date, description, location, and tags. | MUST |
 | PLG-23 | **Calendar data**: current date/time is always available; calendar events are optional. A calendar plugin may fetch an external ICS/CalDAV feed only with the Network permission. App-provided event feeds are out of scope for v1. | SHOULD |
@@ -178,8 +194,8 @@ the photo library, the API key, the server URL, or credentials.
 
 | ID | Requirement | Priority |
 |---|---|---|
-| PLG-25 | The app pushes a fresh state snapshot and a **time tick** at most once per second while the slideshow is visible. | MUST |
-| PLG-26 | The app pushes an immediate update on image change, playback state change, weather refresh, settings change, viewport/orientation change, and plugin enable/install. | MUST |
+| PLG-25 | The app pushes a fresh state snapshot (declared inputs plus mandatory app/time) and a **time tick** at most once per second while the slideshow is visible. | MUST |
+| PLG-26 | The app pushes an immediate update on any declared input change, including image change, playback state change, weather refresh, settings change, viewport/orientation change, and plugin enable/install. | MUST |
 | PLG-27 | Plugins do not need to poll; update delivery is event-driven. A plugin may request a refresh, subject to the once-per-second limit. | MUST |
 | PLG-28 | Time ticks pause while the screen is off, the app is backgrounded, or the plugin is hidden. | MUST |
 | PLG-29 | Update delivery is throttled and dropped updates are coalesced so a slow plugin cannot stall the slideshow. | MUST |
@@ -198,8 +214,8 @@ the photo library, the API key, the server URL, or credentials.
 | ID | Requirement | Priority |
 |---|---|---|
 | PLG-34 | A plugin declares its configuration fields in the manifest as a JSON settings schema. | MUST |
-| PLG-35 | Supported field types: text, multiline text, number, boolean, select, color, and URL. Each field declares a label, default, optional help text, and validation constraints where applicable. | MUST |
-| PLG-36 | The app renders the settings UI from the schema and validates values before applying them. | MUST |
+| PLG-35 | Supported field types: text, multiline text, number, boolean, select, color (including alpha), and URL. Number fields can express opacity. Each field declares a label, default, optional help text, and validation constraints where applicable. | MUST |
+| PLG-36 | The app renders the settings UI from the schema on the plugin's dedicated settings screen and validates values before applying them. | MUST |
 | PLG-37 | Configuration is stored per plugin instance and passed to the plugin as read-only data. | MUST |
 | PLG-38 | Changing a plugin setting triggers an immediate plugin update without restarting the slideshow. | MUST |
 | PLG-39 | Plugin UI labels may be supplied by the plugin; app-owned labels and settings chrome must be localized. | MUST |
@@ -209,9 +225,9 @@ the photo library, the API key, the server URL, or credentials.
 | ID | Requirement | Priority |
 |---|---|---|
 | PLG-40 | Ship reference plugins for clock/time, calendar/date, weather, playback status, and current image information. | SHOULD |
-| PLG-41 | Reference plugins are installed but disabled by default and request no network permission unless needed. | MUST |
-| PLG-42 | Reference plugins demonstrate time ticks, image-change updates, weather data, playback data, image metadata, and JSON settings. | SHOULD |
-| PLG-43 | Existing built-in clock, weather, and photo-metadata overlays remain available until equivalent reference plugins are stable; they must not be silently removed. | MUST |
+| PLG-41 | Bundled reference plugins are present without a manual install. Clock, weather, and metadata are enabled by default; other reference plugins are disabled by default. None request network permission unless needed. | MUST |
+| PLG-42 | Reference plugins demonstrate time ticks, image-change updates, weather data, playback data, image metadata, icons, screenshots, and JSON settings. | SHOULD |
+| PLG-43 | Clock, weather, and photo-metadata overlays are bundled plugins, not compiled-in Flutter widgets. Fresh installs enable them by default; upgrades migrate the existing `OverlaySettings` enabled state and weather coordinates/unit/label into the weather plugin. No compiled-in overlay remains in v1. | MUST |
 
 ### 3.9 Security, privacy, and reliability
 
@@ -230,15 +246,16 @@ the photo library, the API key, the server URL, or credentials.
 
 | ID | Requirement | Priority |
 |---|---|---|
-| PLG-52 | Plugins are installed from local ZIP files only (no URL/catalog install). A bundle contains `plugin.json` plus HTML/CSS/optional JS/assets; the ZIP may have one top-level folder. Limits: 20 MB compressed, 100 MB extracted, 500 files. Reject traversal, symlinks, zip bombs, native binaries, remote code includes, missing entry, and duplicate IDs. | MUST |
-| PLG-53 | The manifest declares id, name, version, apiVersion, author, license, description, entry, optional screenshots, permissions, actions, update triggers, placement, and settings schema. Screenshots are shown as untrusted images in the install/details UI. | MUST |
-| PLG-54 | Plugin overlays are interactive (buttons, links, form controls, text input where available), can request placement changes, and are clamped to safe areas. Placement, size, and z-order persist; app controls/dialogs remain above. | MUST |
+| PLG-52 | Plugins are installed from local ZIP files only (no URL/catalog install). A bundle contains `plugin.json` plus HTML/CSS/optional JS/assets/screenshots/icon; the ZIP may have one top-level folder. Limits: 20 MB compressed, 100 MB extracted, 500 files. Reject traversal, symlinks, zip bombs, native binaries, remote code includes, missing entry, and duplicate IDs. | MUST |
+| PLG-53 | The manifest declares id, name, version, apiVersion, author, homepage/site, license, description, entry, optional icon, optional screenshots, permissions, inputs, actions, update triggers, placement, and settings schema. Icons and screenshots are shown as untrusted images in the list/install/details UI. | MUST |
+| PLG-54 | Plugin overlays are interactive (buttons, links, form controls, text input where available), can request placement changes, support drag/resize with optional grid snap, and are clamped to safe areas. Placement, size, grid settings, and z-order persist; app controls/dialogs remain above. | MUST |
 | PLG-55 | Plugins run in a sandboxed iframe with an opaque origin (`allow-scripts`, no `allow-same-origin`) inside a per-instance transparent webview. They cannot read host storage, cookies, files, secure storage, the API key, server URL, album list, or other plugins. | MUST |
 | PLG-56 | Network is denied by default; granted requests are host-proxied with timeouts, response-size limits, rate limits, and no Immich credentials. Domain allowlists are not implemented in v1; this residual risk is documented. | MUST |
 | PLG-57 | External links are intercepted and opened in the system browser after confirmation. `file:`, `javascript:`, `intent:`, `data:` navigation, popups, and in-app navigation are blocked. | MUST |
 | PLG-58 | The host bridge and snapshot are versioned (v1). Plugin storage is namespaced per instance, size-limited, and removed on uninstall. Actions are declared, user-granted, and rate-limited (default 10/minute). | MUST |
 | PLG-59 | A failed, hung, or repeatedly erroring plugin is hidden/disabled and logged; it must not block the slideshow. Load timeout defaults to 10 seconds; repeated failures within five minutes disable the plugin. | MUST |
-| PLG-60 | On Android devices below the WebView baseline (Chromium 100+), plugins are disabled with an explanatory message; built-in overlays remain available. Desktop plugin rendering uses CEF 149. | MUST |
+| PLG-60 | On Android devices below the WebView baseline (Chromium 100+), plugins are disabled with an explanatory message. Because all overlays are plugins, the slideshow continues without overlays on those devices. Desktop plugin rendering targets CEF 149; Phase 0 found that `webview_cef` 0.6.2 exposes no transparency/background API, so CEF/OSR transparency must be patched or replaced and verified before Phase 4 host work. | MUST |
+| PLG-61 | The manifest declares the snapshot sections a plugin needs (`inputs`); the host delivers only those sections plus mandatory app/time data. The install/details UI discloses the requested inputs. | MUST |
 
 ---
 
@@ -247,7 +264,7 @@ the photo library, the API key, the server URL, or credentials.
 | ID | Requirement | Priority |
 |---|---|---|
 | SET-01 | Settings are organized into collapsible groups rather than one long scrolling page. | MUST |
-| SET-02 | Groups: **Playback**, **Media Filters & Aspect**, **Display**, **Overlays & Plugins**, **Automation**, **Media Cache**, **Connection & Security**, **About & Diagnostics**. | MUST |
+| SET-02 | Groups: **Playback**, **Media Filters & Aspect**, **Display**, **Plugins**, **Automation**, **Media Cache**, **Connection & Security**, **About & Diagnostics**. | MUST |
 | SET-03 | Each group header shows a title and a one-line summary of its current state. | MUST |
 | SET-04 | Groups can be expanded/collapsed independently. The expanded state persists for the session or device. | MUST |
 | SET-05 | The first group starts expanded; all others start collapsed unless a deep link or onboarding tour targets them. | SHOULD |
@@ -263,12 +280,12 @@ the photo library, the API key, the server URL, or credentials.
 | ID | Requirement | Priority |
 |---|---|---|
 | NFR-01 | The slideshow starts without waiting for plugin or overlay initialization. | MUST |
-| NFR-02 | Plugin updates at 1 Hz and built-in overlay refresh must not cause visible slideshow frame drops on supported devices. Use coalesced state, per-instance small webviews, and low-rate OSR. | MUST |
+| NFR-02 | Plugin updates at 1 Hz must not cause visible slideshow frame drops on supported devices. Use coalesced state, per-instance small webviews, and low-rate OSR. | MUST |
 | NFR-03 | The app must run for days without leaking memory, file handles, or player instances; soak targets are 24 hours for Phase 2 and 72 hours for the release gate. | MUST |
 | NFR-04 | Network loss, server downtime, album deletion, and malformed media must degrade gracefully without crashing. | MUST |
 | NFR-05 | All new settings and plugin state survive app restart and normal process death. | MUST |
 | NFR-06 | New UI strings are added to all supported locales; missing translations fall back to English. | MUST |
-| NFR-07 | The app must remain compatible with Android 8.0 (API 26) and above. Plugin rendering requires system WebView/Chromium 100+ on Android (validated in Phase 0); below that baseline plugins are disabled with an explanation, while built-in overlays and the slideshow continue. Desktop plugin rendering uses CEF 149. | MUST |
+| NFR-07 | The app must remain compatible with Android 8.0 (API 26) and above. Plugin rendering requires system WebView/Chromium 100+ on Android; below that baseline plugins (and therefore all overlays) are disabled with an explanation while the slideshow continues. Desktop plugin rendering targets CEF 149, but Phase 0 found `webview_cef` 0.6.2 lacks a transparency API; the gate must be resolved before plugins ship. | MUST |
 | NFR-08 | Plugin permissions, network access, and data exposure are disclosed in the settings UI. | MUST |
 | NFR-09 | No plugin may access the Immich API directly; all app data comes through the versioned snapshot. | MUST |
 | NFR-10 | Documentation is updated in the same change as any requirement-affecting code. | MUST |
@@ -284,13 +301,16 @@ the photo library, the API key, the server URL, or credentials.
 5. **Animation rule**: Set a bucket to Contain with pan strength greater than 0. The asset fills the screen while animating; setting pan strength to 0 restores Contain.
 6. **Unknown metadata**: A video without width/height is never hidden by the aspect filter and uses the Default profile.
 7. **Empty filters**: A filter combination that matches nothing shows the no-match message rather than a black frame.
-8. **Plugin install**: Install a valid plugin. It appears in the plugin list, its permissions are shown, and its overlay can be placed and configured.
+8. **Plugin install**: Install a valid plugin. It appears in the plugin list with its icon, its permissions and requested inputs are shown, and opening it exposes its own settings screen and placement editor.
 9. **Plugin update cadence**: A clock plugin updates every second; an image-info plugin updates immediately when the image changes; a played/paused plugin updates on state change.
 10. **Plugin failure**: A plugin that throws or hangs is removed/disabled without interrupting the slideshow.
 11. **Plugin security**: A plugin without Network permission cannot make outbound requests; no plugin can read the API key or server URL.
 12. **Settings groups**: All groups collapse and expand; the tour can open the group containing its target; the settings screen does not duplicate media filter or profile controls.
 13. **Persistence**: Filters, profiles, plugin configuration, and placement survive app restart.
 14. **Permission degradation**: With `asset.download` denied, Videos is locked off and the slideshow continues with photos and Live Photos.
+15. **All overlays as plugins**: Clock, weather, and metadata are bundled plugins. Fresh installs enable them by default; upgrading from the compiled overlays preserves each enabled state and the weather location/unit/label.
+16. **Per-plugin settings**: Open Plugins → Clock → settings, change the time format, and see the clock overlay update immediately without restarting the slideshow.
+17. **Placement editor**: Drag a plugin, resize it, enable grid snap, change the grid size, and confirm the placement and grid settings survive restart; the box stays inside the safe area.
 
 ---
 
@@ -313,12 +333,15 @@ The Phase 0 product decisions formerly tracked as open questions:
 
 | Question | Decision |
 |---|---|
-| Plugin scripts | Sandboxed HTML/CSS/JavaScript |
-| Plugin distribution | Local ZIP only; no URL install or catalog in v1 |
+| Plugin scripts | Sandboxed HTML/CSS/JavaScript; not Dart, because runtime-installed Dart cannot be safely sandboxed and would expose the host process |
+| Plugin distribution | Local ZIP only; no URL install or catalog in v1. Bundled reference plugins are preinstalled. |
+| Plugin bundle contents | `plugin.json` metadata/settings/inputs, HTML/CSS/optional JS, optional screenshots and icon |
 | Signatures | No signatures in v1; explicit consent, permissions shown, SHA-256 recorded |
-| Plugin screens | Slideshow only in v1 |
+| Plugin screens | Plugin rendering is slideshow-only in v1; per-plugin settings screens are app-rendered |
 | Plugin limits | 20 MB ZIP, 100 MB extracted, 500 files, 20 installed, 10 active, one instance per plugin in v1, 1 MB storage, 10 actions/minute, API v1 |
-| Built-in overlays vs plugins | Built-in clock/weather/metadata remain; reference plugins are additional |
+| Built-in overlays vs plugins | All overlays are bundled plugins, including clock/weather/metadata; compiled-in overlays are removed after migration |
+| Plugin placement | Free drag-and-drop with resize; optional snap-to-grid with a persisted grid size in the Plugins screen |
+| Plugin settings | Each installed plugin has its own settings screen rendered from its manifest schema |
 | Plugin playback actions | Declared and user-granted next/previous/pause/mute/open settings/open media selection; rate-limited |
 | Network allowlist | No domain allowlist in v1; host-proxied network with explicit permission and documented residual risk |
 

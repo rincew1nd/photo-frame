@@ -23,6 +23,10 @@ class NightModeService {
     return current >= start || current < end;
   }
 
+  static double screenBrightness(double dimOpacity) {
+    return (1.0 - dimOpacity.clamp(0.0, 1.0)).toDouble();
+  }
+
   static int _normalize(int minutes) {
     final value = minutes % 1440;
     return value < 0 ? value + 1440 : value;

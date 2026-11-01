@@ -76,6 +76,10 @@ PlatformServices _services() {
     fullscreen: const UnsupportedFullscreen(),
     biometrics: _NoBiometrics(),
     singleInstance: _NoopSingleInstance(),
+    autostart: const UnsupportedAutostart(),
+    permissions: const UnsupportedPermissions(),
+    kiosk: const UnsupportedKiosk(),
+    brightness: const UnsupportedBrightness(),
     livePhotoBounce: const PlatformLivePhotoBounceSupport(),
   );
 }
@@ -196,8 +200,7 @@ void main() {
         ),
         GoRoute(
           path: '/slideshow',
-          builder: (context, state) =>
-              const Scaffold(body: Text('Slideshow')),
+          builder: (context, state) => const Scaffold(body: Text('Slideshow')),
         ),
       ],
     );

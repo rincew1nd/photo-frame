@@ -99,18 +99,17 @@ The slideshow is a Flutter `Stack` with three logical layers:
 
 1. Photo/video layer: image widget or media_kit video texture.
 2. Plugin layer: one transparent interactive webview per plugin instance, positioned by the host.
+   This includes the clock, weather, and metadata overlays, which ship as bundled plugins.
 3. App controls/dialogs layer: Flutter widgets.
-
-The built-in clock, weather, and photo metadata overlays remain Flutter widgets. They are not
-plugins in v1.
 
 ### Plugin composition
 
 Each plugin instance owns a rectangular box. The host positions the webview, clamps it to safe
-areas, and persists placement. The plugin can request a new placement through the host API. Clicks
-outside the box reach Flutter. On Android, if platform-view z-order prevents Flutter controls from
-rendering above plugin webviews, the host temporarily hides plugin webviews while controls or
-dialogs are open. Phase 0 validates whether the fallback is required.
+areas, and persists placement. The user moves and resizes the box directly over the slideshow in an
+edit mode or from the plugin's settings screen, optionally snapping to a configurable grid; the
+plugin can also request a new placement through the host API. Clicks outside the box reach Flutter. On Android, if platform-view z-order prevents Flutter
+controls from rendering above plugin webviews, the host temporarily hides plugin webviews while
+controls or dialogs are open.
 
 ## 6. Layers and responsibilities
 
@@ -134,7 +133,7 @@ dialogs are open. Phase 0 validates whether the fallback is required.
 - Cache: download, verification, metadata, prefetch, eviction, offline resolution.
 - Settings: typed repository with migrations.
 - Plugins: ZIP validation, installation, registry, configuration, storage.
-- Weather: external provider for the built-in overlay and plugin snapshot.
+- Weather: external provider for plugins that declare the weather input.
 
 ### Platform
 
@@ -247,8 +246,11 @@ Plugin actions
 5. **Host-mediated plugin capabilities.** Network, storage, actions, and placement are explicit host
    APIs, not direct access.
 6. **Local ZIP plugin distribution.** No marketplace, remote install, or signatures in v1.
-7. **No data migration.** New application ID; fresh setup.
-8. **No Pi/iOS/macOS.** The architecture stays portable but no platform work is done.
+7. **All overlays are plugins.** Clock, weather, and metadata ship as bundled HTML/CSS/JS plugins;
+   no compiled-in overlay remains after migration.
+8. **No data migration from the legacy app.** New application ID; fresh setup. Overlay-to-plugin
+   migration applies only within this app's settings.
+9. **No Pi/iOS/macOS.** The architecture stays portable but no platform work is done.
 
 ## 12. Build and packaging
 
@@ -271,7 +273,8 @@ with FFmpeg codecs.
 | Linux software OSR cost | Small per-plugin webviews; low OSR frame rate; 1 Hz state pushes |
 | libmpv codec availability | Pin FFmpeg build; test HEVC/AV1/ProRes; fallback to Immich playback stream |
 | DNG/ProRAW quality/performance | LibRaw version test; embedded preview first; screen-sized cache |
-| WebView version on no-GMS devices | Runtime version check; disable plugins below baseline; built-in overlays remain |
+| WebView version on no-GMS devices | Runtime version check; disable plugins below baseline; slideshow runs without overlays |
+| All overlays depend on the plugin host | Ship clock/weather/metadata as bundled plugins; prove the Phase 0 transparency gate before removing compiled overlays |
 | 24/7 leaks | Soak tests, bounded caches, watchdog restarts |
 | Plugin supply chain | Explicit ZIP import, permission consent, sandbox, no secrets exposed |
 | HEVC patent licensing | Legal review before broad commercial distribution |

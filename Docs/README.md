@@ -1,7 +1,7 @@
 # Photo Frame Documentation
 
 Status: Draft v0.1
-Last updated: 2026-10-27
+Last updated: 2026-10-31
 Source of truth for product requirements: [`../REQUIREMENTS.md`](../REQUIREMENTS.md)
 
 `REQUIREMENTS.md` has been aligned in Phase 0 to the new application identity and Docs set. Functional
@@ -36,7 +36,8 @@ package, signing key, settings, or cache.
   **LibRaw**.
 - HDR/10-bit originals are decoded and **tone-mapped to SDR**. True HDR output is out of scope.
 - Plugins are HTML/CSS/JS bundles installed from a local ZIP. They are interactive, sandboxed,
-  movable, and able to display descriptions and screenshots in the install UI.
+  movable/resizable, and able to display icons, descriptions, and screenshots in the install UI.
+- All overlays are plugins; clock, weather, and metadata ship as bundled plugins enabled by default.
 - Plugin rendering uses a transparent webview per instance: **CEF via webview_cef** on desktop and
   the **system WebView** on Android.
 - Plugin network access, storage, and app actions are mediated by the host. Plugins never receive
@@ -52,6 +53,7 @@ package, signing key, settings, or cache.
 | [`plugins.md`](plugins.md) | Plugin bundle, manifest, host, sandbox, JS API, placement, lifecycle, limits |
 | [`data-cache.md`](data-cache.md) | Immich API/auth, cache/offline, settings, database, sync |
 | [`platforms.md`](platforms.md) | Windows, Linux x64, Android behaviour, startup, kiosk, packaging |
+| [`platform-checklists.md`](platform-checklists.md) | Manual Android, Windows, and Linux verification checklists and recorded results |
 | [`security.md`](security.md) | Threat model, secrets, plugin sandbox, local server, updates |
 | [`licensing.md`](licensing.md) | MIT app license, third-party licenses, LGPL/CEF obligations, patents |
 | [`testing-ci.md`](testing-ci.md) | Test strategy, media fixtures, soak tests, CI/build/release |
@@ -88,19 +90,31 @@ known risks.
 
 ## Known limitations
 
-- True HDR output is not supported. HDR10/HLG video and 10-bit stills are tone-mapped to SDR.
-  HDR10+ dynamic metadata and Dolby Vision are not supported.
-- Streaming a full-screen transparent CEF overlay on Linux uses a software readback path. Plugin
-  instances are kept small and update at low frequency.
-- Android plugin support depends on the system WebView version. Built-in overlays continue to work
-  when plugins are unavailable.
-- Phase 0 found that `webview_cef` 0.6.2 exposes no transparent-background API, and the reference
-  Android WebView (12.1.2.326) rendered the transparent overlay blank. CEF transparency and modern
-  Android WebView rendering remain gates for Phase 4; built-in overlays are the fallback.
-- HEVC 10-bit HDR10 failed on the stock Android media_kit build in Phase 0. Phase 3 needs a custom
-  libmpv/FFmpeg decoder or the Immich playback-stream fallback. AVIF and DNG/ProRAW still need
-  libheif/LibRaw builds; HEIC currently depends on the platform decoder.
-- The final supported locale list and app branding are not yet decided.
+- True HDR output is not supported. HDR10/HLG video and 10-bit stills are decoded to SDR; HDR-to-SDR
+  tuning remains unverified. HDR10+ dynamic metadata and Dolby Vision are not supported.
+- Linux has no runtime validation recorded. XDG autostart, kiosk/fullscreen, `systemd-inhibit`,
+  second-instance focus, and tar.gz packaging are implemented but unverified. AppImage and .deb are
+  not implemented; Wayland is not validated.
+- Android start-on-boot depends on a battery-optimization exemption and OEM autostart permission. A
+  real reboot on Xiaomi/MIUI Android 12 with `start_on_boot=true` did not launch the app; the log
+  reports `BOOT_COMPLETED: process is not permitted to auto start`. The test device is not exempt,
+  and start-on-boot is gated on the exemption. Shell broadcasts are blocked on non-rooted devices.
+  Code and preferences are verified; real boot launch is not.
+- Windows default and kiosk launches are verified after the `waitUntilReadyToShow()` fix
+  (`window_manager_plugin.dll`, 0xC0000005/0xa005); visual kiosk behavior and sign-in autostart still
+  need manual verification.
+- Update-check UI and APK download/install are not implemented. No GitHub release channel or release
+  keystore is configured, and Android release builds use the debug signing key.
+- Full kiosk lockdown is incomplete on Windows/Linux: close/alt-tab suppression and multi-monitor
+  selection are missing.
+- Phase 4 is not started. Android plugin support/WebView baseline, CEF diagnostics, and the
+  transparent CEF/WebView behavior found in Phase 0 remain open. All overlays are planned as
+  bundled plugins, so below the Android WebView baseline the slideshow would run without overlays.
+- HEVC 10-bit HDR10 failed on the stock Android media_kit build in Phase 0. HDR playback remains
+  unverified and may need a custom libmpv/FFmpeg decoder or the Immich playback-stream fallback. AVIF
+  and DNG/ProRAW still need libheif/LibRaw builds; HEIC currently depends on the platform decoder.
+- Localization is English-only; the final supported locale list and app branding are not decided.
+  Audio focus is implemented and unit/widget tested; Android device verification is pending.
 
 ## Change control
 

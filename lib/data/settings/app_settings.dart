@@ -111,7 +111,11 @@ enum AdaptiveBackground {
   blurredCover;
 
   static AdaptiveBackground fromJson(Object? value) {
-    return _enumByName(AdaptiveBackground.values, value, AdaptiveBackground.none);
+    return _enumByName(
+      AdaptiveBackground.values,
+      value,
+      AdaptiveBackground.none,
+    );
   }
 
   String get jsonName => name;
@@ -325,12 +329,7 @@ class PlaybackSettings {
 
   factory PlaybackSettings.fromJson(Map<String, dynamic> json) {
     return PlaybackSettings(
-      intervalSeconds: _asInt(
-        json['intervalSeconds'],
-        10,
-        min: 1,
-        max: 3600,
-      ),
+      intervalSeconds: _asInt(json['intervalSeconds'], 10, min: 1, max: 3600),
       shuffle: _asBool(json['shuffle'], true),
       transition: TransitionType.fromJson(json['transition']),
       muted: _asBool(json['muted'], true),
@@ -371,7 +370,9 @@ class AspectProfile {
     this.adaptiveBackground = AdaptiveBackground.none,
     this.imageMotion = true,
     int panStrength = 0,
-  }) : panStrength = panStrength < 0 ? 0 : (panStrength > 100 ? 100 : panStrength);
+  }) : panStrength = panStrength < 0
+           ? 0
+           : (panStrength > 100 ? 100 : panStrength);
 
   final ImageFit fit;
   final AdaptiveBackground adaptiveBackground;
@@ -481,12 +482,10 @@ class CustomizationProfile {
   }
 
   bool matches(MediaKind? kind, AspectBucket? aspect) {
-    if (mediaTypes.isNotEmpty &&
-        (kind == null || !mediaTypes.contains(kind))) {
+    if (mediaTypes.isNotEmpty && (kind == null || !mediaTypes.contains(kind))) {
       return false;
     }
-    if (aspects.isNotEmpty &&
-        !aspects.contains(aspect ?? AspectBucket.other)) {
+    if (aspects.isNotEmpty && !aspects.contains(aspect ?? AspectBucket.other)) {
       return false;
     }
     return true;
@@ -568,12 +567,7 @@ class NightModeSettings {
       enabled: _asBool(json['enabled'], false),
       startMinutes: _asInt(json['startMinutes'], 1320, min: 0, max: 1439),
       endMinutes: _asInt(json['endMinutes'], 420, min: 0, max: 1439),
-      dimOpacity: _asNullableDouble(
-            json['dimOpacity'],
-            min: 0,
-            max: 1,
-          ) ??
-          0.8,
+      dimOpacity: _asNullableDouble(json['dimOpacity'], min: 0, max: 1) ?? 0.8,
       pauseSlideshow: _asBool(json['pauseSlideshow'], true),
       hideOverlays: _asBool(json['hideOverlays'], true),
     );
@@ -688,27 +682,42 @@ class AutomationSettings {
   const AutomationSettings({
     this.startOnBoot = false,
     this.fullscreen = false,
+    this.kiosk = false,
+    this.updateChecks = false,
   });
 
   final bool startOnBoot;
   final bool fullscreen;
+  final bool kiosk;
+  final bool updateChecks;
 
-  AutomationSettings copyWith({bool? startOnBoot, bool? fullscreen}) {
+  AutomationSettings copyWith({
+    bool? startOnBoot,
+    bool? fullscreen,
+    bool? kiosk,
+    bool? updateChecks,
+  }) {
     return AutomationSettings(
       startOnBoot: startOnBoot ?? this.startOnBoot,
       fullscreen: fullscreen ?? this.fullscreen,
+      kiosk: kiosk ?? this.kiosk,
+      updateChecks: updateChecks ?? this.updateChecks,
     );
   }
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'startOnBoot': startOnBoot,
     'fullscreen': fullscreen,
+    'kiosk': kiosk,
+    'updateChecks': updateChecks,
   };
 
   factory AutomationSettings.fromJson(Map<String, dynamic> json) {
     return AutomationSettings(
       startOnBoot: _asBool(json['startOnBoot'], false),
       fullscreen: _asBool(json['fullscreen'], false),
+      kiosk: _asBool(json['kiosk'], false),
+      updateChecks: _asBool(json['updateChecks'], false),
     );
   }
 }
@@ -729,7 +738,7 @@ class AppSettings {
     this.automation = const AutomationSettings(),
   });
 
-  static const int currentSchemaVersion = 2;
+  static const int currentSchemaVersion = 3;
 
   final int schemaVersion;
   final ConnectionSettings connection;

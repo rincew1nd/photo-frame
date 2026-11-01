@@ -2,7 +2,7 @@
 
 Status: Draft v0.1
 Related: [`architecture.md`](architecture.md), [`media.md`](media.md), [`plugins.md`](plugins.md),
-[`security.md`](security.md)
+[`security.md`](security.md), [`platform-checklists.md`](platform-checklists.md)
 
 ## 1. Test strategy
 
@@ -15,6 +15,10 @@ Related: [`architecture.md`](architecture.md), [`media.md`](media.md), [`plugins
 | Performance/soak | 24/7 stability, memory, FPS, 1 Hz plugins, video | Automated + manual |
 | Security | ZIP validation, sandbox, network, storage isolation, secret redaction | Unit/integration/manual |
 | Media | Codecs, HDR tone-map, HEIC/AVIF/DNG/ProRAW, Live Photo, fallbacks | Fixtures + reference hardware |
+
+Manual platform checks and recorded results are in
+[`platform-checklists.md`](platform-checklists.md). Android boot evidence is recorded there; most
+Windows and Linux checks remain pending.
 
 ## 2. Unit coverage priorities
 
@@ -100,9 +104,12 @@ Record WebView/CEF versions, GPU, and driver in performance results.
 - Action rate limits and permission denial.
 - Loopback server path traversal/token isolation.
 - Secret redaction in logs/crash reports.
-- APK signature verification/update path.
+- APK signature verification/update path (pending release signing and update flow).
 
 ## 9. CI
+
+Current CI builds debug Android, Windows, and Linux artifacts and runs analyze/test. The release,
+signing, and packaging jobs below are target state, not current behavior.
 
 GitHub Actions matrix:
 
@@ -138,8 +145,10 @@ flutter build linux --release
 flutter build apk --release --split-per-abi
 ```
 
-Native build scripts under `scripts/` handle libheif, LibRaw, CEF, and packaging. Exact commands are
-documented when the scaffold is created.
+Native build scripts under `scripts/` handle libheif and LibRaw. CEF integration remains Phase 4
+work. Packaging scripts exist for Windows ZIP (`scripts/package-windows.sh`), Linux tar.gz
+(`scripts/package-linux.sh`), and Android split APKs with sha256sums (`scripts/package-android.sh`).
+They do not sign or publish artifacts.
 
 ## 11. Release checklist
 

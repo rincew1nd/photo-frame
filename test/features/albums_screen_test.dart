@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:photoframe/app/connection_providers.dart' as conn;
+import 'package:photoframe/app/providers.dart';
 import 'package:photoframe/app/router.dart';
 import 'package:photoframe/data/immich/models.dart';
 import 'package:photoframe/data/settings/app_settings.dart';
 import 'package:photoframe/features/slideshow/slideshow_screen.dart';
 import 'package:photoframe/l10n/app_localizations.dart';
+import 'package:photoframe/platform/services.dart';
 
 class _FakeConnectionController extends conn.ConnectionController {
   _FakeConnectionController(this.initial);
@@ -74,6 +76,9 @@ Future<_FakeConnectionController> _pump(WidgetTester tester) async {
           controller = _FakeConnectionController(_state());
           return controller;
         }),
+        brightnessServiceProvider.overrideWithValue(
+          const UnsupportedBrightness(),
+        ),
       ],
       child: MaterialApp.router(
         locale: const Locale('en'),

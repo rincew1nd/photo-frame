@@ -52,6 +52,14 @@ void main() {
       );
     });
 
+    test('maps dim opacity to screen brightness and clamps', () {
+      expect(NightModeService.screenBrightness(0.8), closeTo(0.2, 1e-9));
+      expect(NightModeService.screenBrightness(0), 1);
+      expect(NightModeService.screenBrightness(1), 0);
+      expect(NightModeService.screenBrightness(-0.5), 1);
+      expect(NightModeService.screenBrightness(1.5), 0);
+    });
+
     test('disabled is never active', () {
       expect(
         NightModeService.isActive(

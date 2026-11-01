@@ -81,11 +81,17 @@ void main() {
     final fromZero = migrate(<String, dynamic>{'schemaVersion': 0});
     expect(fromZero.schemaVersion, AppSettings.currentSchemaVersion);
     expect(fromZero.display.theme, 'system');
-    expect(fromZero.playback.videoPlaybackMode, VideoPlaybackMode.staticPreview);
+    expect(
+      fromZero.playback.videoPlaybackMode,
+      VideoPlaybackMode.staticPreview,
+    );
     expect(fromZero.playback.livePhotoMode, LivePhotoMode.off);
     expect(fromZero.defaultProfile.imageMotion, isTrue);
     expect(fromZero.defaultProfile.adaptiveBackground, AdaptiveBackground.none);
     expect(fromZero.automation.fullscreen, isFalse);
+    expect(fromZero.automation.startOnBoot, isFalse);
+    expect(fromZero.automation.kiosk, isFalse);
+    expect(fromZero.automation.updateChecks, isFalse);
 
     final clamped = migrate(<String, dynamic>{
       'schemaVersion': 0,
@@ -114,7 +120,7 @@ void main() {
       'automation': <String, dynamic>{'kiosk': true, 'launcherMode': true},
     });
 
-    expect(migrated.schemaVersion, 2);
+    expect(migrated.schemaVersion, 3);
     expect(migrated.playback.livePhotoMode, LivePhotoMode.loop);
     expect(
       migrated.playback.videoPlaybackMode,
@@ -158,9 +164,10 @@ void main() {
     final display = json['display'] as Map<String, dynamic>;
     expect(display.containsKey('imageMotion'), isFalse);
     final automation = json['automation'] as Map<String, dynamic>;
-    expect(automation.containsKey('kiosk'), isFalse);
+    expect(automation.containsKey('startOnBoot'), isTrue);
+    expect(automation.containsKey('kiosk'), isTrue);
+    expect(automation.containsKey('updateChecks'), isTrue);
     expect(automation.containsKey('launcherMode'), isFalse);
-    expect(automation.containsKey('updateChecks'), isFalse);
     final defaultProfile = json['defaultProfile'] as Map<String, dynamic>;
     expect(defaultProfile.containsKey('livePhotoMode'), isFalse);
   });
@@ -185,12 +192,43 @@ void main() {
       },
     });
 
-    expect(loaded.schemaVersion, 2);
+    expect(loaded.schemaVersion, 3);
     expect(loaded.filters.selectedAssetIds, <String>{'asset-1'});
     expect(loaded.playback.livePhotoMode, LivePhotoMode.off);
     expect(loaded.defaultProfile.imageMotion, isTrue);
     expect(loaded.automation.fullscreen, isFalse);
+    expect(loaded.automation.startOnBoot, isFalse);
+    expect(loaded.automation.kiosk, isTrue);
+    expect(loaded.automation.updateChecks, isFalse);
     expect(loaded.customizations, isEmpty);
+    final automation = loaded.toJson()['automation'] as Map<String, dynamic>;
+    expect(automation.containsKey('startOnBoot'), isTrue);
+    expect(automation.containsKey('kiosk'), isTrue);
+    expect(automation.containsKey('updateChecks'), isTrue);
+    expect(automation.containsKey('launcherMode'), isFalse);
+  });
+
+  test('migration from v2 preserves automation and adds v3 defaults', () {
+    final migrated = migrate(<String, dynamic>{
+      'schemaVersion': 2,
+      'automation': <String, dynamic>{
+        'startOnBoot': true,
+        'fullscreen': true,
+        'kiosk': true,
+      },
+    });
+
+    expect(migrated.schemaVersion, 3);
+    expect(migrated.automation.startOnBoot, isTrue);
+    expect(migrated.automation.fullscreen, isTrue);
+    expect(migrated.automation.kiosk, isTrue);
+    expect(migrated.automation.updateChecks, isFalse);
+
+    final automation = migrated.toJson()['automation'] as Map<String, dynamic>;
+    expect(automation['startOnBoot'], isTrue);
+    expect(automation['fullscreen'], isTrue);
+    expect(automation['kiosk'], isTrue);
+    expect(automation['updateChecks'], isFalse);
   });
 
   test('round trips new fields and customizations through JSON', () {
@@ -203,7 +241,12 @@ void main() {
         adaptiveBackground: AdaptiveBackground.blurredCover,
         imageMotion: false,
       ),
-      automation: AutomationSettings(fullscreen: true),
+      automation: AutomationSettings(
+        startOnBoot: true,
+        fullscreen: true,
+        kiosk: true,
+        updateChecks: true,
+      ),
       customizations: <CustomizationProfile>[
         CustomizationProfile(
           id: 'custom-1',
@@ -226,6 +269,9 @@ void main() {
     );
     expect(decoded.defaultProfile.imageMotion, isFalse);
     expect(decoded.automation.fullscreen, isTrue);
+    expect(decoded.automation.startOnBoot, isTrue);
+    expect(decoded.automation.kiosk, isTrue);
+    expect(decoded.automation.updateChecks, isTrue);
     expect(decoded.customizations.single.id, 'custom-1');
     expect(decoded.customizations.single.mediaTypes, <MediaKind>{
       MediaKind.video,

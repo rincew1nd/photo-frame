@@ -1,8 +1,15 @@
 # Plugin System
 
-Status: Draft v0.1
+Status: Draft v0.3 (design target; Phase 4 not started)
 Related: [`architecture.md`](architecture.md), [`security.md`](security.md),
 [`requirements-alignment.md`](requirements-alignment.md)
+
+> Implementation status (2026-11-01): this document is the Phase 4 design target, not current
+> behavior. The app currently ships clock/weather/metadata overlays as compiled Flutter widgets and a
+> placeholder Plugins settings screen; the target is for all three to become bundled plugins. No
+> plugin code, webview dependency, registry, host, bridge, or reference plugin exists. Phase 0's
+> transparent-overlay gate is unresolved: `webview_cef` 0.6.2 has no transparency API, and the
+> available Android WebView is below the Chromium 100+ baseline.
 
 ## 1. Model
 
@@ -13,14 +20,27 @@ A plugin is a self-contained ZIP bundle containing:
 - a CSS stylesheet;
 - optional sandboxed JavaScript;
 - optional local assets;
-- optional screenshots and description for the install UI.
+- optional screenshots and an icon for the list/install UI.
 
 Plugins render as transparent, interactive overlays above the current photo/video and below the
 app controls and dialogs. They receive a read-only application state snapshot and may expose
 settings, invoke approved actions, request network access, and request placement changes.
 
+Every overlay is a plugin in v1, including clock, weather, and metadata. Those three are bundled
+with the app and enabled by default; no compiled-in overlay remains after migration.
+
 Plugins never receive the Immich API key, server URL, credentials, album lists, or arbitrary app
 storage. Plugins never call Immich directly.
+
+### Why HTML/CSS/JS, not Dart
+
+Runtime-installed Dart cannot be safely sandboxed: Flutter has no supported dynamic-code sandbox,
+and arbitrary Dart would run inside the host process with access to app storage and credentials.
+Compiling each plugin ahead of time would require a build step, a signature/trust model, and native
+toolchains per platform — none of which fit local ZIP installation. Sandboxed HTML/CSS/JS inside the
+per-instance webview keeps the security boundary the rest of this design already relies on. A
+declarative JSON-only UI is the safer fallback if scripting proves too risky, but it cannot express
+live clocks, animation, or arbitrary event handling as cleanly.
 
 ## 2. Bundle layout
 
@@ -32,12 +52,13 @@ clock.zip
   script.js
   assets/
     ...
+  icon.png
   screenshots/
     clock.png
 ```
 
 A ZIP may also contain a single top-level folder; the host normalises the path. Required files:
-`plugin.json` and the entry document. Assets and screenshots must be inside the bundle.
+`plugin.json` and the entry document. Assets, icon, and screenshots must be inside the bundle.
 
 Rules:
 
@@ -45,6 +66,7 @@ Rules:
 - No native binaries, executables, or remote code includes.
 - HTML/CSS/JS assets must be local; external network is host-mediated.
 - The entry file must be inside the extracted bundle.
+- Icon and screenshots must be local PNG, JPEG, or WebP within size limits.
 - ZIP limits: 20 MB compressed, 100 MB extracted, 500 files (defaults; configurable).
 
 ## 3. Manifest
@@ -63,10 +85,12 @@ Example `plugin.json`:
   "description": "A configurable clock overlay for the photo frame.",
   "homepage": "https://example.com/clock",
   "entry": "index.html",
+  "icon": "icon.png",
   "screenshots": ["screenshots/clock.png"],
   "permissions": {
     "network": false
   },
+  "inputs": ["time", "config"],
   "actions": ["next", "pause"],
   "updateTriggers": ["timeTick", "imageChange", "playbackChange"],
   "placement": {
@@ -93,6 +117,19 @@ Example `plugin.json`:
       "type": "boolean",
       "label": "Show seconds",
       "default": false
+    },
+    "color": {
+      "type": "color",
+      "label": "Text color",
+      "default": "#FFFFFFFF"
+    },
+    "backgroundOpacity": {
+      "type": "number",
+      "label": "Background opacity",
+      "default": 0.4,
+      "min": 0,
+      "max": 1,
+      "step": 0.05
     }
   }
 }
@@ -112,23 +149,28 @@ Example `plugin.json`:
 | `description` | yes | Short description shown in install/details UI |
 | `homepage` | no | Informational URL |
 | `entry` | yes | Entry HTML file inside the bundle |
+| `icon` | no | Relative image path shown in the plugin list and install/details UI |
 | `screenshots` | no | Relative image paths shown in the install/details UI |
 | `permissions` | yes | Capability declarations (currently `network`) |
+| `inputs` | no | Snapshot sections the plugin needs: `app`, `time`, `weather`, `playback`, `image`, `config`, `placement`; app/time are always sent |
 | `actions` | no | App actions the plugin may request |
-| `updateTriggers` | no | Declared state/event needs; the host still pushes required minimums |
+| `updateTriggers` | no | Declared event needs; the host still pushes required minimums |
 | `placement` | no | Default position, size, z-order, night-mode visibility |
 | `settings` | no | JSON settings schema |
 
 ### Placement
 
-- `anchor`: `top|center|bottom` x `start|center|end`.
-- `x`, `y`: optional normalised coordinates (0..1) within the safe area.
-- `width`, `height`: logical pixels; clamped to the viewport.
+- `anchor`: `top|center|bottom` x `start|center|end`; used as the initial/default placement.
+- `x`, `y`: normalised coordinates (0..1) within the safe area; updated by drag-and-drop.
+- `width`, `height`: logical pixels; editable by resizing, clamped to the viewport.
 - `zOrder`: integer; higher is closer to the viewer. App controls/dialogs always remain above.
 - `showDuringNight`: default `false`.
 
 The host validates placement against the viewport and safe-area insets and persists the final
-values.
+values. Placement can be edited directly over the slideshow in an edit mode and from the plugin's
+settings screen, with drag and edge/corner resize handles. The Plugins screen has an optional
+snap-to-grid toggle and a configurable grid size (logical pixels). Grid settings persist globally;
+per-plugin position and size persist per instance.
 
 ### Settings schema
 
@@ -144,9 +186,11 @@ Supported field types:
 | `color` | `default` (`#RRGGBB` or `#AARRGGBB`) |
 | `url` | `default`, `pattern`; URL validation |
 
-The app renders the settings UI from the schema, validates before applying, and sends the updated
-configuration to the plugin immediately. Configuration is stored per plugin instance and is
-read-only to the plugin.
+The app renders the settings UI from the schema in the plugin's dedicated screen (Plugins → plugin
+→ settings), validates before applying, and sends the updated configuration to the plugin
+immediately. Configuration is stored per plugin instance and is read-only to the plugin. The same
+screen also exposes enable/disable, update, uninstall, permissions, requested inputs, and the
+placement editor.
 
 ## 4. Installation and lifecycle
 
@@ -154,11 +198,11 @@ read-only to the plugin.
 
 1. User selects a ZIP file.
 2. Extract to a temporary directory.
-3. Validate ZIP structure, manifest JSON, API compatibility, duplicate ID, file limits, screenshot
-   types, and entry existence.
+3. Validate ZIP structure, manifest JSON, API compatibility, duplicate ID, file limits, icon and
+   screenshot types, declared inputs, and entry existence.
 4. Compute and store a SHA-256 hash.
-5. Show identity: name, ID, version, author, license, description, screenshots, requested
-   permissions, and app/API compatibility.
+5. Show identity: name, ID, version, author, license, description, icon, screenshots, requested
+   permissions, requested inputs, and app/API compatibility.
 6. User explicitly installs/enables.
 7. Move the bundle atomically into the plugin store.
 8. Register the plugin and apply the default placement.
@@ -169,7 +213,8 @@ No plugin is installed silently. A failed validation leaves no partial installat
 ### Update
 
 - Import a ZIP with the same ID and a newer version.
-- Show the new identity, version, description, screenshots, and permission changes.
+- Show the new identity, version, description, icon, screenshots, requested inputs, and permission
+  changes.
 - Preserve configuration and placement when the settings schema is compatible.
 - If the schema is incompatible, show a confirmation and require explicit acceptance.
 - Install atomically; keep the previous version if the update fails.
@@ -190,13 +235,14 @@ No plugin is installed silently. A failed validation leaves no partial installat
 
 ### Inspect
 
-The plugin list/details screen shows:
+The plugin list shows each plugin's icon, name, version, and enabled state. Opening a plugin goes to
+its dedicated settings screen, which shows:
 
-- name, ID, version, author, license, description, screenshots;
+- name, ID, version, author, license, description, icon, screenshots;
 - API compatibility;
-- permissions and action grants;
-- settings;
-- placement (editable);
+- permissions, requested inputs, and action grants;
+- schema-rendered settings;
+- placement editor (drag, resize, grid snap/grid size);
 - enable/disable, update, uninstall;
 - recent errors/logs for that plugin.
 
@@ -205,8 +251,11 @@ The plugin list/details screen shows:
 ### Per-instance transparent webview
 
 - One transparent webview per plugin instance.
-- Desktop: CEF via `webview_cef`, rendered offscreen into a Flutter texture.
-- Android: system WebView via `webview_flutter`.
+- Desktop: CEF via `webview_cef`, rendered offscreen into a Flutter texture. Phase 0 found that
+  `webview_cef` 0.6.2 exposes no transparency/background API; a CEF/OSR transparency patch or an
+  alternative must be proven before production host work.
+- Android: system WebView via `webview_flutter`. Validate on Chromium 100+; the Phase 0 reference
+  WebView was below baseline and rendered plugin HTML blank.
 - The webview is sized to the plugin box, not the full screen. Clicks outside the box reach Flutter.
 - App controls/dialogs are Flutter widgets above the plugin layer.
 - Android fallback: if platform-view z-order prevents Flutter controls from appearing above
@@ -239,7 +288,11 @@ The plugin list/details screen shows:
 - The host clamps to the viewport and safe areas, animates if requested, persists, and updates the
   webview bounds.
 - Plugins cannot draw outside their box.
-- The user can edit placement in the app settings.
+- The user edits placement directly over the slideshow in edit mode or from the plugin's settings
+  screen: drag to move, edge/corner handles to resize, optional grid snap, and a configurable grid
+  size. Grid settings persist globally.
+- Placement is stored as normalized x/y plus logical width/height and clamped after rotation or
+  viewport changes.
 - Plugins are hidden during night mode by default; `showDuringNight` is a per-instance option.
 
 ### Input and links
@@ -255,10 +308,11 @@ The plugin list/details screen shows:
 
 ### State delivery
 
-- The host pushes a full read-only snapshot:
+- The host pushes a read-only snapshot filtered by the manifest's `inputs`; `app` and `time` are
+  always sent:
   - app/plugin API version, locale, time zone, theme, viewport, safe-area insets, night mode;
   - current time/date;
-  - weather (or null);
+  - weather (or null), fetched when the plugin declares `weather`;
   - playback state, index, total, interval, elapsed progress, mute, slideshow running;
   - current image metadata (ID, type, Live Photo, dimensions, aspect bucket, MIME, cached/offline,
     EXIF date, description, location, tags);
@@ -301,6 +355,7 @@ host.reportError(message, details)
 Rules:
 
 - All messages are JSON, size-bounded, and validated.
+- `getState` contains only the declared `inputs` plus mandatory app/time data.
 - The host ignores unknown actions and malformed messages.
 - Action calls are rate-limited (default 10 per minute; configurable).
 - Storage is namespaced per instance; default quota 1 MB.
@@ -356,8 +411,9 @@ The install/details UI discloses:
 
 - Network access;
 - requested actions;
+- requested snapshot inputs;
 - storage use;
-- description, screenshots, author, version, license, and compatibility.
+- icon, description, screenshots, author, version, license, and compatibility.
 
 The user can revoke network/actions later. Revocation takes effect immediately. Plugins that fail
 due to revoked permissions must handle the error gracefully.
@@ -405,24 +461,26 @@ See [`security.md`](security.md) for the full threat model.
 
 ## 14. Reference plugins
 
-Bundled, disabled by default:
+Bundled with the app:
 
-- clock/time;
-- calendar/date;
-- weather;
-- playback status;
-- current image information.
+- clock/time — enabled by default;
+- weather — enabled by default, owns the location/unit/label settings;
+- photo metadata — enabled by default;
+- calendar/date — disabled by default;
+- playback status — disabled by default;
+- current image information — disabled by default.
 
 They:
 
 - use no network unless required;
 - demonstrate time ticks, image-change updates, weather data, playback data, image metadata, and
   JSON settings;
-- include descriptions and screenshots;
-- are installed but disabled, so the built-in overlays remain the default experience.
+- include icons, descriptions, and screenshots;
+- replace the compiled clock/weather/metadata overlays. Migration maps the old `OverlaySettings`
+  enabled state and weather coordinates/unit/label into the bundled plugin configuration.
 
-Built-in clock, weather, and metadata overlays remain until equivalent reference plugins are
-stable.
+No compiled-in clock, weather, or metadata overlay remains in v1. On devices below the WebView
+baseline, the slideshow runs without overlays.
 
 ## 15. V1 exclusions
 
@@ -440,13 +498,15 @@ stable.
 ## 16. Testing
 
 - ZIP validation: traversal, bombs, invalid manifests, duplicate IDs, missing entry, oversized
-  screenshots.
+  screenshots/icons, invalid declared inputs.
 - Install/update/enable/disable/uninstall and storage cleanup.
+- Per-plugin settings screen rendering/validation and the plugin list icon/state.
+- Built-in overlay migration: enabled state and weather settings survive upgrade.
 - Sandbox: no host access, no direct network, no cross-plugin storage.
 - Network proxy: permission/revocation, timeouts, rate limits.
-- Placement: clamping, safe areas, animation, persistence, z-order.
+- Placement: drag, resize, grid snap/grid size, clamping, safe areas, persistence, z-order.
 - Input: buttons, links, external browser confirmation, blocked schemes.
-- State: 1 Hz coalescing, immediate events, pause conditions, hidden plugins.
+- State: input filtering, 1 Hz coalescing, immediate events, pause conditions, hidden plugins.
 - Actions: declared/granted/rate-limit violations.
 - Failure: timeout, repeated errors, isolation from slideshow.
 - Performance: 1 Hz updates with video playing; no frame drops.

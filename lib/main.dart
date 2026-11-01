@@ -18,6 +18,7 @@ void main() {
       MediaKit.ensureInitialized();
       if (Platform.isWindows || Platform.isLinux) {
         await WindowManager.instance.ensureInitialized();
+        await WindowManager.instance.waitUntilReadyToShow();
       }
       final instance = await Bootstrap.initialize();
       bootstrap = instance;

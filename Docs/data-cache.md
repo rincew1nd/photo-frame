@@ -17,7 +17,7 @@ The app talks directly to an Immich server. No intermediary service is deployed.
   relationships.
 - Original download and optional playback stream.
 - GitHub release metadata for app updates.
-- Weather data for the built-in overlay and plugin snapshot (Open-Meteo or equivalent, no auth).
+- Weather data for plugins that declare the weather input (Open-Meteo or equivalent, no auth).
 
 ### Authentication
 
@@ -92,7 +92,7 @@ Drift/SQLite tables:
 | `album_sync_states` | Album id, last sync, cursor/page state, asset count |
 | `derived_images` | Derived path, source checksum, decode profile, dimensions |
 | `plugin_registry` | Installed plugin id, version, bundle path, enabled state, API version |
-| `plugin_instances` | Instance id, placement, z-order, visibility, config JSON, night-mode flag |
+| `plugin_instances` | Instance id, normalized placement, size, z-order, visibility, config JSON, night-mode flag |
 | `plugin_storage` | Namespaced key/value storage per plugin instance |
 | `schema_meta` | Applied cache database schema version |
 
@@ -156,7 +156,8 @@ Concurrency is bounded (downloads and decodes). The current slide is never evict
 - Playback: interval, shuffle, transition, mute, video/Live Photo type filter, aspect filter.
 - Media Filters & Aspect: Default profile and five buckets (fit, Live Photo mode, pan strength).
 - Display: keep screen on, night mode window/brightness, theme, image motion.
-- Overlays & Plugins: built-in overlays, plugin management, permissions, placement, settings.
+- Plugins: plugin list, per-plugin settings screens, permissions, placement editor, grid snap/size.
+  Clock, weather, and metadata are bundled plugins, not separate built-in controls.
 - Automation: start on boot, launcher mode (Android), kiosk/fullscreen (desktop), update checks.
 - Media Cache: quota, prefetch count, sync now, cache statistics.
 - Connection & Security: server, API key/auth, permissions, biometric gating, logout.
@@ -179,12 +180,16 @@ default. The onboarding tour can deep-link to a group.
 - The registry stores identity, version, API version, bundle path, enabled state, and checksum.
 - Instance configuration and placement live in the app DB.
 - Plugin storage is namespaced by instance and removed on uninstall.
-- Screenshots and descriptions come from the installed bundle and are displayed in the install UI.
+- Icons, screenshots, and descriptions come from the installed bundle and are displayed in the
+  list/install UI.
+- Placement grid snap/grid size are app settings, not plugin data.
 
 ## 6. Weather
 
-- The app fetches weather for the built-in overlay when configured.
-- Weather data is exposed to plugins through the snapshot only when enabled and available.
+- The host fetches weather when an enabled plugin declares the `weather` input, using the bundled
+  weather plugin's location/unit/label settings.
+- Weather data is exposed to that plugin through the snapshot only when available; the compiled
+  overlay toggle no longer gates fetching.
 - Failures return null to plugins; they do not block slideshow playback.
 - Location can be configured manually or derived from EXIF/device location with permission. The
   exact provider and location strategy are implemented in Phase 2/3.

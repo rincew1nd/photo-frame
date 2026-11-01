@@ -50,6 +50,7 @@ app.*.map.json
 # Local scratch
 .tmp/
 .playwright-mcp/
+dist/
 
 # Native still-image codecs
 /third_party/stills/

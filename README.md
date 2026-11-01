@@ -9,7 +9,14 @@ cross-platform Flutter application for **Windows x64**, **Linux x64**, and **And
 
 ## Current scope
 
-Phase 2 is implemented, and Phase 3 video, Live Photo, and native still decoding are now implemented.
+Phases 1–2 are implemented. Phase 3 video, Live Photo, and native still decoding are implemented with
+verification gaps (HDR, Linux/Android native builds, broader runtime testing). Phase 4 is not
+started. Phase 5 is in progress: night brightness, diagnostics, start-on-boot, desktop kiosk and
+keep-awake, single-instance focus, and packaging scripts are implemented; Windows default and kiosk
+launches are verified. Windows fullscreen now uses a Win32 popup style with monitor bounds and native focus; a manual Win32 check hid the taskbar. Final app-level taskbar/cursor confirmation and sign-in autostart remain pending. Updates,
+full kiosk lockdown, Linux runtime validation, and localization remain. Audio focus is implemented and
+unit/widget tested; Android device verification is pending.
+
 The app can connect to Immich, select albums or individual media, cache media for offline playback,
 and run a full-screen slideshow with overlays and night mode. HEIC/HEIF/AVIF and DNG/ProRAW decode
 natively through bundled libheif/LibRaw when those native libraries are present; without them the app
@@ -28,7 +35,20 @@ Implemented:
 - Live Photo Off/Live/Loop/Bounce motion playback with a still fallback.
 - Ken Burns pan/zoom, contain/cover fitting, and adaptive backgrounds (ambient glow or blurred cover).
 - Disk cache with checksum verification, resume, LRU eviction, quota, and offline playback.
-- Clock, weather, and EXIF overlays; night mode; settings screens.
+- Clock, weather, and EXIF overlays; settings screens.
+- Night mode with overlay dimming, pause, hidden overlays, and Android window brightness
+  (`1 - dimOpacity`) that restores when night mode ends or the slideshow closes.
+- Start-on-boot and launcher plumbing: Android `BootReceiver` + HOME intent, Windows Run key, and
+  Linux XDG autostart. Android boot requires a battery-optimization exemption and the OEM autostart
+  permission; the Automation screen gates start-on-boot on the exemption and links to the OEM
+  autostart and Home app settings.
+- Desktop kiosk mode (fullscreen, always-on-top, skip taskbar, fixed window, hidden cursor),
+  keep-awake, and second-instance focus. Windows default and kiosk launches are verified; visual
+  kiosk behavior is pending.
+- About & diagnostics: version/build, plugin API v1, platform/OS, cache stats, redacted logs,
+  error count/copy, and the Flutter license page.
+- Settings schema v3 with start-on-boot, fullscreen, kiosk, and update-check fields.
+- Packaging scripts for Windows ZIP, Linux tar.gz, and Android split APKs with sha256sums.
 - Logging with secret redaction.
 - Single-instance lock, wake-lock, and fullscreen.
 
@@ -37,8 +57,14 @@ Not implemented yet:
 - **Phase 3 (remaining):** HDR-to-SDR verification and tuning, native library builds for Linux and
   Android (scripts exist but are unverified), and broader platform runtime testing. Video playback,
   Live Photo motion, and Windows native still decoding are implemented.
-- **Phase 4:** plugin host and HTML/CSS/JS overlays.
-- **Phase 5:** start-on-boot, kiosk mode, and in-app updates.
+- **Phase 4:** plugin host, WebView baseline checks, HTML/CSS/JS overlays, and migration of the
+  current clock/weather/metadata overlays into bundled plugins.
+- **Phase 5:** update-check UI and APK download/install (blocked on a release channel and keystore),
+  full kiosk lockdown (close/alt-tab suppression and multi-monitor selection), Linux AppImage/deb
+  and runtime validation, and localization completion. Audio focus is implemented and unit/widget\n  tested; Android device verification is pending.
+
+Android release builds currently use the debug signing key; no GitHub release channel or release
+keystore is configured.
 
 ## How it works
 
@@ -88,6 +114,22 @@ flutter build linux --debug
 flutter build linux --release
 ```
 
+Release packaging scripts stage artifacts under `dist/`:
+
+```bash
+bash scripts/package-windows.sh             # dist/photo-frame-windows-x64.zip
+bash scripts/package-linux.sh               # dist/photo-frame-linux-x64.tar.gz
+bash scripts/package-android.sh             # split APKs + sha256sums.txt
+```
+
+On Windows, run the packaging scripts with Git Bash (not WSL). `scripts/fetch-stills-deps.ps1`
+requires Windows PowerShell 5.1 (not PowerShell 7). Each packaging script also accepts a
+`--skip-build` flag to package an existing release build. They do not sign or publish artifacts.
+Windows default and kiosk launches and the rebuilt ZIP are verified locally. Fullscreen now uses a
+Win32 popup style with monitor bounds and native focus; a manual Win32 check hid the taskbar. Final
+app-level taskbar/cursor confirmation and sign-in autostart still need manual checks. Linux was never
+run in this environment. Android release builds are debug-signed, and the update flow is not implemented.
+
 ## Install and run
 
 ### Windows
@@ -96,6 +138,10 @@ After building, run the executable and keep its `data/` directory and DLLs besid
 
 - Debug: `build/windows/x64/runner/Debug/photoframe.exe`
 - Release: `build/windows/x64/runner/Release/photoframe.exe`
+
+The release build launches and stays running with kiosk on or off after the `waitUntilReadyToShow()`
+fix: `setSkipTaskbar` needs the plugin's `ITaskbarList3` pointer, which is null until that call
+(`window_manager_plugin.dll`, 0xC0000005/0xa005).
 
 For development, use:
 
@@ -115,7 +161,12 @@ adb install -r build/app/outputs/flutter-apk/app-debug.apk
 
 Launch **Photo Frame** from the home screen. The minimum supported version is Android 8.0 (API 26).
 For a release build, use `build/app/outputs/flutter-apk/app-release.apk`, or the split-per-ABI
-outputs (for example `app-arm64-v8a-release.apk`) if you built with `--split-per-abi`.
+outputs (for example `app-arm64-v8a-release.apk`) if you built with `--split-per-abi`. Release
+builds currently use the debug signing key.
+
+For unattended start, open **Settings > Automation** and grant the battery-optimization exemption,
+the OEM autostart permission, and optionally select Photo Frame as the Home app. Start on boot stays
+disabled until the battery exemption is confirmed. The test device is not yet exempt.
 
 ### Linux
 
@@ -164,15 +215,15 @@ Plans          phase plans
 third_party    vendored packages
 ```
 
-Directories for Phase 3/4/5 work will be added when that work starts; see
-[Docs/architecture.md](Docs/architecture.md).
+See [Docs/architecture.md](Docs/architecture.md) for the layer rules.
 
 ## Tests and CI
 
-`flutter analyze` and `flutter test` must pass. `.github/workflows/ci.yml` runs analyze/test on every
-push and pull request, and builds Android, Windows, and Linux on non-pull-request runs. Tiny still
-fixtures under `test/fixtures/stills` drive gated native decode tests, which skip when the native
-libraries are not built.
+`flutter analyze` and `flutter test` must pass. Current baseline: `flutter analyze` clean, 261 passed,
+2 native skips (without DLLs). `.github/workflows/ci.yml` runs analyze/test on every push and pull
+request, and builds Android, Windows, and Linux on non-pull-request runs. Tiny still fixtures under
+`test/fixtures/stills` drive gated native decode tests, which skip when the native libraries are not
+built.
 
 ## Limitations, roadmap, and troubleshooting
 
@@ -186,10 +237,26 @@ libraries are not built.
   otherwise the Immich preview is shown. Windows native HEIC/AVIF/DNG decode was verified locally;
   Linux and Android require the build scripts to be run on those platforms.
 - **Empty slideshow:** select at least one album and run **Sync now**.
-- **Linux:** build and runtime behavior on Linux has not been fully verified.
+- **Linux:** build and runtime behavior has not been verified; no Linux host was available. XDG
+  autostart, kiosk, sleep inhibit, and tar.gz packaging are implemented but unvalidated.
+- **Android boot:** a real reboot on Xiaomi/MIUI Android 12 with `start_on_boot=true` did not launch
+  the app (`BOOT_COMPLETED: process is not permitted to auto start`). Grant the MIUI autostart
+  permission and the battery-optimization exemption; the test device is not exempt and start-on-boot
+  is gated on it. Shell broadcasts are blocked on non-rooted devices. The HOME role is selected in
+  Android settings.
+- **Android signing/updates:** release APKs use the debug signing key; no release keystore or GitHub
+  release channel is configured. Update-check UI and APK download/install are not implemented.
+- **Kiosk:** Windows/Linux kiosk is implemented to hide window controls and the cursor, but does not
+  suppress close/alt-tab or select a monitor. Windows default and kiosk launches are verified; visual
+  kiosk behavior (always-on-top, taskbar hiding, cursor) is not manually verified.
 - **Videos:** full playback with audio is implemented; HDR-to-SDR tone-mapping is not yet verified
   and native codec builds remain pending.
-- **Plugins, kiosk/boot, updates, true HDR:** scheduled for Phase 4 and Phase 5.
+- **Plugins/WebView:** Phase 4 is not started; WebView baseline checks, plugin degradation, and CEF
+  diagnostics are pending.
+- **Localization:** English-only; final locale list undecided. Audio focus is implemented and
+  unit/widget tested; Android device verification is pending.
+- **True HDR:** out of scope for v1; HDR sources are decoded to SDR, and tone-mapping is not yet
+  verified.
 
 ## Documentation
 
@@ -197,6 +264,8 @@ libraries are not built.
 - [Product requirements](REQUIREMENTS.md)
 - [Phase plans](Plans/README.md)
 - [Architecture](Docs/architecture.md)
+- [Platform support](Docs/platforms.md)
+- [Platform checklists](Docs/platform-checklists.md)
 - [Phase 1/2 verification](Docs/phase-1-2-verification.md)
 - [Phase 0 spike results](Docs/spike-0-results.md)
 

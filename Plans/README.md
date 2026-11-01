@@ -1,7 +1,7 @@
 # Implementation Plans
 
 Status: Draft v0.1
-Last updated: 2026-10-27
+Last updated: 2026-10-31
 Technical documentation: [`../Docs/README.md`](../Docs/README.md)
 Product requirements: [`../REQUIREMENTS.md`](../REQUIREMENTS.md)
 
@@ -73,7 +73,12 @@ A phase is done when:
 
 ## Current status
 
-Phase 0 is `Done (conditional go)`; see `Docs/spike-0-results.md`. Phases 1 and 2 are
-`Done (automated/API verification; platform-runtime verification partial)`; see
-[`../Docs/phase-1-2-verification.md`](../Docs/phase-1-2-verification.md). Phase 3 is next; platform,
-Linux, CI, and 24h wall-clock soak gaps remain.
+Phase 0 is `Done (conditional go)`; see `Docs/spike-0-results.md`. Phases 1–2 are `Done
+(automated/API verification; platform-runtime verification partial)`; see
+[`../Docs/phase-1-2-verification.md`](../Docs/phase-1-2-verification.md). Phase 3 is implemented with
+verification gaps: HDR tuning, Linux/Android native library builds, and broader runtime testing.
+Phase 4 is not started. Phase 5 is in progress: Android boot/HOME/security plumbing, night
+brightness, diagnostics, desktop automation, single-instance focus, and packaging scripts are
+implemented.
+Updates, full kiosk lockdown, Linux runtime validation, localization, and audio focus remain. There
+is no Linux host or release channel/keystore.

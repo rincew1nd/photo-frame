@@ -129,7 +129,9 @@ formats are not promised; use the Immich preview fallback.
 
 - Video and Live Photo motion audio is routed through libmpv.
 - Mute/unmute is a global app setting; audio starts muted or per settings.
-- Android audio focus is handled when playback starts/stops; no background playback in v1.
+- Android audio focus is handled by `AudioFocusService` when unmuted playback starts/stops;
+  `VideoSlide` pauses on focus loss and resumes after transient gain. Unit/widget tested; device
+  verification pending. No background playback in v1.
 - The slideshow can run muted; Live Photo audio follows the same mute state.
 
 ## 8. Performance targets

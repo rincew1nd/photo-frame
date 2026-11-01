@@ -50,9 +50,37 @@ final Provider<CacheStore> cacheStoreProvider = Provider<CacheStore>(
 final Provider<PlatformServices> platformServicesProvider =
     Provider<PlatformServices>((ref) => ref.watch(bootstrapProvider).platform);
 
-final FutureProvider<bool> livePhotoBounceSupportProvider = FutureProvider<bool>(
-  (ref) => ref.watch(platformServicesProvider).livePhotoBounce.supported,
+final Provider<AudioFocusService> audioFocusServiceProvider =
+    Provider<AudioFocusService>((ref) => PlatformAudioFocus());
+
+final Provider<BiometricsService> biometricsServiceProvider =
+    Provider<BiometricsService>(
+      (ref) => ref.watch(platformServicesProvider).biometrics,
+    );
+
+final Provider<AutostartService> autostartServiceProvider =
+    Provider<AutostartService>(
+      (ref) => ref.watch(platformServicesProvider).autostart,
+    );
+
+final FutureProvider<bool> autostartSupportProvider = FutureProvider<bool>(
+  (ref) => ref.watch(autostartServiceProvider).supported,
 );
+
+final Provider<PermissionsService> permissionsServiceProvider =
+    Provider<PermissionsService>(
+      (ref) => ref.watch(platformServicesProvider).permissions,
+    );
+
+final Provider<BrightnessService> brightnessServiceProvider =
+    Provider<BrightnessService>(
+      (ref) => ref.watch(platformServicesProvider).brightness,
+    );
+
+final FutureProvider<bool> livePhotoBounceSupportProvider =
+    FutureProvider<bool>(
+      (ref) => ref.watch(platformServicesProvider).livePhotoBounce.supported,
+    );
 
 final Provider<MediaPlaybackFactory> mediaPlaybackFactoryProvider =
     Provider<MediaPlaybackFactory>((ref) => MediaKitPlayback.new);

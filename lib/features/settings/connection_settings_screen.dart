@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide ConnectionState;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:photoframe/app/connection_providers.dart';
@@ -92,16 +93,23 @@ class _ConnectionSettingsScreenState
           decoration: InputDecoration(
             labelText: 'API key',
             border: const OutlineInputBorder(),
-            suffixIcon: IconButton(
-              tooltip: _obscure ? 'Show API key' : 'Hide API key',
-              icon: Icon(
-                _obscure ? Icons.visibility : Icons.visibility_off,
-              ),
-              onPressed: () {
-                setState(() {
-                  _obscure = !_obscure;
-                });
-              },
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  key: const Key('connection-copy-key'),
+                  tooltip: 'Copy API key',
+                  icon: const Icon(Icons.copy),
+                  onPressed: _copyApiKey,
+                ),
+                IconButton(
+                  tooltip: _obscure ? 'Show API key' : 'Hide API key',
+                  icon: Icon(
+                    _obscure ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: _toggleVisibility,
+                ),
+              ],
             ),
           ),
         ),
@@ -134,9 +142,7 @@ class _ConnectionSettingsScreenState
                 ListTile(
                   title: const Text('Auth mode'),
                   subtitle: Text(
-                    connection.authMode == AuthMode.oauth
-                        ? 'OAuth'
-                        : 'API key',
+                    connection.authMode == AuthMode.oauth ? 'OAuth' : 'API key',
                   ),
                 ),
                 ListTile(
@@ -168,6 +174,38 @@ class _ConnectionSettingsScreenState
         ],
       ],
     );
+  }
+
+  Future<void> _toggleVisibility() async {
+    if (_obscure) {
+      final allowed = await ref
+          .read(biometricsServiceProvider)
+          .authenticate('Reveal API key');
+      if (!allowed || !mounted) {
+        return;
+      }
+    }
+    setState(() {
+      _obscure = !_obscure;
+    });
+  }
+
+  Future<void> _copyApiKey() async {
+    final key = _apiKey.text;
+    if (key.isEmpty) {
+      return;
+    }
+    final allowed = await ref
+        .read(biometricsServiceProvider)
+        .authenticate('Copy API key');
+    if (!allowed || !mounted) {
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: key));
+    if (!mounted) {
+      return;
+    }
+    _snack('API key copied');
   }
 
   Future<void> _save() async {
@@ -319,9 +357,8 @@ class _ConnectionSettingsScreenState
   }
 
   void _snack(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _userLabel(ConnectionSettings connection) {

@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:photoframe/core/failures.dart';
 import 'package:photoframe/core/logging/app_logger.dart';
 import 'package:photoframe/core/logging/crash_handler.dart';
 import 'package:photoframe/data/cache/app_database.dart';
@@ -55,10 +54,7 @@ class Bootstrap {
     final acquired = await platform.singleInstance.acquire();
     if (!acquired) {
       await database.close();
-      throw const AppFailure(
-        FailureKind.storage,
-        'Another Photo Frame instance is already running.',
-      );
+      exit(0);
     }
 
     final apiKey = await secure.read(SecretKeys.immichApiKey);
