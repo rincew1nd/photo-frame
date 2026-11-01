@@ -384,6 +384,27 @@ void main() {
     expect(find.text('1 error logged'), findsOneWidget);
   });
 
+  testWidgets('plugins screen explains an unsupported WebView', (tester) async {
+    final repository = InMemorySettingsRepository();
+    await _pump(
+      tester,
+      repository: repository,
+      screen: const PluginsSettingsScreen(),
+      overrides: [
+        webViewSupportProvider.overrideWith(
+          (ref) async => const WebViewSupport(
+            supported: false,
+            chromeMajor: 92,
+            versionName: '12.1.2.326',
+          ),
+        ),
+      ],
+    );
+
+    expect(find.text('Plugins are unavailable'), findsOneWidget);
+    expect(find.textContaining('Chromium 92'), findsOneWidget);
+  });
+
   testWidgets('plugins screen lists installed plugins and add action', (
     tester,
   ) async {

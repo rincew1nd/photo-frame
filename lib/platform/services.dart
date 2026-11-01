@@ -3,6 +3,7 @@ import 'dart:ffi';
 import 'dart:io';
 
 import 'package:ffi/ffi.dart' as ffi;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:path/path.dart' as p;
@@ -836,6 +837,79 @@ class FileLockSingleInstance implements SingleInstanceService {
       return;
     } finally {
       await handle.close();
+    }
+  }
+}
+
+const int minPluginChromiumMajor = 100;
+
+class WebViewSupport {
+  const WebViewSupport({
+    required this.supported,
+    this.chromeMajor,
+    this.versionName,
+  });
+
+  final bool supported;
+  final int? chromeMajor;
+  final String? versionName;
+
+  String get message {
+    if (supported) {
+      return '';
+    }
+    final version = chromeMajor != null
+        ? 'Chromium $chromeMajor'
+        : versionName == null
+        ? 'an unknown WebView version'
+        : 'WebView $versionName';
+    return 'Plugins require Android WebView/Chromium '
+        '$minPluginChromiumMajor or newer. This device reports $version.';
+  }
+}
+
+WebViewSupport webViewSupportFor({
+  required TargetPlatform platform,
+  int? chromeMajor,
+  String? versionName,
+}) {
+  switch (platform) {
+    case TargetPlatform.android:
+      return WebViewSupport(
+        supported: chromeMajor != null && chromeMajor >= minPluginChromiumMajor,
+        chromeMajor: chromeMajor,
+        versionName: versionName,
+      );
+    case TargetPlatform.windows:
+    case TargetPlatform.linux:
+      return const WebViewSupport(supported: true);
+    default:
+      return const WebViewSupport(supported: false);
+  }
+}
+
+class PlatformWebViewInfo {
+  const PlatformWebViewInfo();
+
+  static const MethodChannel _channel = MethodChannel(
+    'com.rincew1nd.photoframe/platform',
+  );
+
+  Future<WebViewSupport> read() async {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      return webViewSupportFor(platform: defaultTargetPlatform);
+    }
+    try {
+      final info = await _channel.invokeMapMethod<String, Object?>(
+        'webViewInfo',
+      );
+      return webViewSupportFor(
+        platform: TargetPlatform.android,
+        chromeMajor: info?['chromeMajor'] as int?,
+        versionName: info?['versionName'] as String?,
+      );
+    } on Object {
+      return const WebViewSupport(supported: false);
     }
   }
 }
