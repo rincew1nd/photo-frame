@@ -1,0 +1,6 @@
+[submodule "third_party/webview_cef"]
+	path = third_party/webview_cef
+	url = https://github.com/rincew1nd/photo-frame-webview_cef.git
+[submodule "third_party/flutter_secure_storage_windows"]
+	path = third_party/flutter_secure_storage_windows
+	url = https://github.com/rincew1nd/photo-frame-flutter_secure_storage_windows.git
