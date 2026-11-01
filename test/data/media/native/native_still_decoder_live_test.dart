@@ -38,6 +38,6 @@ void main() {
         isTrue,
         reason: 'decoded pixels are entirely zero',
       );
-    }, skip: decoder == null ? skipReason : null);
+    }, skip: skipReason);
   }
 }
