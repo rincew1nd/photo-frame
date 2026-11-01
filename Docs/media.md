@@ -1,9 +1,5 @@
 # Media Pipeline
 
-Status: Draft v0.1
-Related: [`architecture.md`](architecture.md), [`data-cache.md`](data-cache.md),
-[`plugins.md`](plugins.md)
-
 ## 1. Goals
 
 - Play original Immich photos, videos, Live Photos, and animated GIFs with audio.
@@ -129,9 +125,8 @@ formats are not promised; use the Immich preview fallback.
 
 - Video and Live Photo motion audio is routed through libmpv.
 - Mute/unmute is a global app setting; audio starts muted or per settings.
-- Android audio focus is handled by `AudioFocusService` when unmuted playback starts/stops;
-  `VideoSlide` pauses on focus loss and resumes after transient gain. Unit/widget tested; device
-  verification pending. No background playback in v1.
+- Android audio focus is handled by `AudioFocusService` when unmuted playback starts and stops;
+  `VideoSlide` pauses on focus loss and resumes after transient gain. No background playback in v1.
 - The slideshow can run muted; Live Photo audio follows the same mute state.
 
 ## 8. Performance targets

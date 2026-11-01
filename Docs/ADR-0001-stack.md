@@ -2,14 +2,11 @@
 
 - Status: Accepted
 - Date: 2026-10-27
-- Deciders: Product/engineering (photo frame)
-- Related: [`architecture.md`](architecture.md), [`media.md`](media.md), [`plugins.md`](plugins.md)
 
 ## Context
 
 The application must run on Windows 10/11 x64, Linux x64, and Android 8+ (API 26), with a possible
-future extension elsewhere. The existing Android app is Kotlin/Compose, but this project is a
-greenfield application with a new identity.
+future extension elsewhere. It is a greenfield application with its own identity.
 
 The hard requirements are:
 
@@ -48,7 +45,7 @@ HDR/10-bit originals are decoded and tone-mapped to SDR. True HDR output is out 
 
 | Stack | Original codecs | Transparent HTML overlay | Reuse | Assessment |
 |---|---|---|---|---|
-| Flutter + media_kit + CEF/WebView | Excellent via libmpv/FFmpeg | Feasible; validated in Phase 0 | None | **Chosen** |
+| Flutter + media_kit + CEF/WebView | Excellent via libmpv/FFmpeg | Feasible with the patched `webview_cef` fork | None | **Chosen** |
 | Kotlin Multiplatform + Compose | Android media good; desktop integration custom/young | Custom JCEF/CEF OSR | High if keeping the old app | Rejected for this greenfield app; higher desktop risk |
 | Electron + Capacitor | Poor for originals; HTML5 codecs only | Trivial | None | Rejected: strict originals |
 | Tauri 2 | Poor; system WebView codecs | Web UI easy; native video compositing unsolved | Rust core | Rejected: originals and mobile maturity |
@@ -81,35 +78,19 @@ HDR/10-bit originals are decoded and tone-mapped to SDR. True HDR output is out 
 
 | Risk | Mitigation |
 |---|---|
-| CEF transparent OSR or input does not work | Phase 0 spike; patch `webview_cef` to enable transparent painting; if unresolved, re-evaluate stack |
-| Android controls cannot render above the WebView | Phase 0 spike; hide plugin webviews while controls/dialogs are open |
+| CEF transparent OSR or input does not work | Patch `webview_cef` for transparent painting (done in the pinned fork); if unresolved, re-evaluate stack |
+| Android controls cannot render above the WebView | Hide plugin webviews while controls/dialogs are open |
 | Linux full-screen CEF readback is too expensive | Per-plugin small webviews; low OSR frame rate; only push state at 1 Hz |
 | libmpv build lacks a needed codec | Pin FFmpeg/libmpv build; test HEVC/AV1/ProRes; Immich playback stream as last resort |
 | ProRAW is not handled well by LibRaw | Test early; use embedded preview fallback; document limitations |
 | Android WebView is old or missing | Version check; degrade plugins; slideshow runs without overlays because all overlays are plugins |
 | 24/7 memory growth | Soak tests, bounded caches, watchdog restarts |
 
-## Phase 0 validation (2026-10-27)
+## Implementation notes
 
-The spike kept this stack. It also recorded constraints that do not change the decision:
-
-- H.264 and AV1 played on the Android API 29 reference; HEVC 10-bit HDR10 failed with the stock
-  media_kit Android build. Phase 3 must use a custom libmpv/FFmpeg build or the Immich playback-stream
-  fallback.
-- HEIC decoded through the Android platform decoder; AVIF failed and libheif/LibRaw were absent.
-  Phase 3 must ship and test those native decoders.
-- The reference Huawei WebView (12.1.2.326) is below the Chromium 100+ plugin baseline and rendered
-  blank in the transparent overlay probe. Desktop `webview_cef` 0.6.2 exposes no transparency setting.
-  Phase 4 remains conditional on proving transparency and a modern Android WebView.
-- Linux and desktop CEF runtime performance were not executed in this environment.
-
-See [`spike-0-results.md`](spike-0-results.md) for evidence and the conditional go/no-go.
-
-## Follow-up actions
-
-1. Phase 0 validates transparency, input, Android z-order, codecs, tone-mapping, HEIC/DNG decode.
-   **Partially complete:** see [`spike-0-results.md`](spike-0-results.md); Linux, desktop CEF runtime,
-   HEVC, AVIF/RAW, and modern-Android WebView validation remain open.
-2. If the CEF spike fails, reopen this ADR before writing production plugin code.
-3. Pin Flutter, media_kit, CEF/webview_cef, libheif, and LibRaw versions at scaffold time.
-4. Record every architectural deviation in a new ADR.
+- H.264 and AV1 play on Android. HEVC 10-bit HDR10 fails with the stock media_kit Android build;
+  those files use the Immich playback-stream fallback.
+- HEIC uses libheif; AVIF and RAW require the native decoder build.
+- Desktop CEF transparency and input are provided by the pinned `webview_cef` fork.
+- Android plugins require Chromium 100+. Older WebViews disable plugins and their overlays.
+- Linux CEF runtime performance is not validated.

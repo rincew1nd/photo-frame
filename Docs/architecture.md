@@ -1,9 +1,5 @@
 # Architecture
 
-Status: Draft v0.1
-Related: [`plugins.md`](plugins.md), [`media.md`](media.md), [`data-cache.md`](data-cache.md),
-[`platforms.md`](platforms.md), [`ADR-0001-stack.md`](ADR-0001-stack.md)
-
 ## 1. Context
 
 The application is a full-screen photo frame for an Immich library. It runs continuously on a
@@ -53,15 +49,14 @@ The new application is greenfield Flutter with a new identity (`com.rincew1nd.ph
 | Biometrics | local_auth | Android; Windows Hello where available; Linux fail-open |
 | Logging | logging + file sink + crash handler | Rotation and redaction |
 | Updates | GitHub API + Android APK install; desktop release flow | Sideload-compatible |
-| Tests | flutter_test; integration_test in later phases | Unit and widget now; integration and soak later |
+| Tests | flutter_test and integration_test | Unit, widget, integration, and soak tests |
 | Build | GitHub Actions | Windows, Linux x64, Android |
 
 ## 4. App identity
 
 - Application ID and Dart namespace: `com.rincew1nd.photoframe`.
 - Android FileProvider: `com.rincew1nd.photoframe.fileprovider`.
-- Android OAuth redirect: a custom scheme derived from the application ID; the exact URI is
-  finalized during Phase 1.
+- Android OAuth redirect: a custom scheme derived from the application ID.
 - Desktop OAuth: system browser + loopback redirect.
 - Windows app user model ID and Linux desktop file / window class use the same application ID.
 - New signing key. Release builds are signed by a dedicated keystore stored in CI secrets.
@@ -155,28 +150,34 @@ controls or dialogs are open.
 lib/
   app/                    bootstrap, routing, theme, l10n setup
   core/                   shared models, clock, logging, errors
-  features/
-    setup/                server URL, auth, permission checks
-    albums/               album selection
-    slideshow/            slideshow screen, controls, overlays
-    settings/             grouped settings, plugin management
-    media_selection/      manual asset selection
   data/
-    immich/               API client, DTOs, auth, permission checks
     cache/                Drift database, downloads, sync, eviction
+    immich/               API client, DTOs, auth, permission checks
+    media/                playback, derived images, native decoders
+    plugins/              manifest validation, store, seeder
+    secure/               OS secure storage
     settings/             typed settings repository and migrations
     weather/              weather client
   domain/
-    slideshow/            sequence, filters, profiles, state machine
+    display/              fullscreen, night mode, keep-awake
     media/                player abstraction, live photos, image pipeline
+    plugins/              placement, snapshots, bridge policy
+    slideshow/            sequence, filters, profiles, state machine
+  features/
+    albums/               album selection
+    media_selection/      manual asset selection
+    plugins/              plugin management UI and overlays
+    settings/             grouped settings
+    setup/                server URL, auth, permission checks
+    slideshow/            slideshow screen and controls
+  l10n/                   ARB source and generated localizations
   platform/               interfaces and platform implementations
-Docs/                     this documentation
-Plans/                    phase plans
+  plugins/host/           loopback server, bridge, sessions, webviews
+plugins/                  bundled example plugins and packaged ZIPs
+scripts/                  native builds and packaging
+third_party/              patched dependencies and generated still build output
 test/
 ```
-
-Phase 3/4/5 directories (native codecs, plugins, assets, scripts, and integration tests) will be added
-when that work starts.
 
 The project is a single Flutter application. Do not split into multiple packages until a concrete
 need appears.
@@ -267,8 +268,8 @@ with FFmpeg codecs.
 
 | Risk | Mitigation |
 |---|---|
-| CEF transparent OSR/input issues | Phase 0 spike; patch webview_cef; fallback to a different overlay design |
-| Android platform-view z-order | Spike; hide plugin webviews while controls/dialogs are open |
+| CEF transparent OSR/input issues | Patch webview_cef (done in the pinned fork); fallback to a different overlay design |
+| Android platform-view z-order | Hide plugin webviews while controls/dialogs are open |
 | Linux software OSR cost | Small per-plugin webviews; low OSR frame rate; 1 Hz state pushes |
 | libmpv codec availability | Pin FFmpeg build; test HEVC/AV1/ProRes; fallback to Immich playback stream |
 | DNG/ProRAW quality/performance | LibRaw version test; embedded preview first; screen-sized cache |
@@ -287,4 +288,4 @@ with FFmpeg codecs.
 - Security: [`security.md`](security.md)
 - Licensing: [`licensing.md`](licensing.md)
 - Tests and CI: [`testing-ci.md`](testing-ci.md)
-- Requirements alignment: [`requirements-alignment.md`](requirements-alignment.md)
+- Product requirements: [`../REQUIREMENTS.md`](../REQUIREMENTS.md)

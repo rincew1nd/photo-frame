@@ -1,8 +1,5 @@
 # Licensing
 
-Status: Draft v0.1
-Related: [`architecture.md`](architecture.md), [`plugins.md`](plugins.md)
-
 This is an engineering summary, not legal advice.
 
 ## 1. Application license
@@ -28,10 +25,10 @@ Required repository additions:
 | webview_cef | Apache-2.0 | Include notice |
 | CEF | BSD-style | Include CEF/Chromium third-party licenses |
 | Chromium | BSD-style plus third-party licenses | Include `LICENSES.chromium.html` or equivalent |
-| libheif | LGPL-3.0 | Planned Phase 3; dynamic linking; notices/source offer |
-| libde265 | LGPL-3.0 | Planned Phase 3; dynamic linking; notices/source offer |
-| dav1d | BSD-2-Clause | Planned Phase 3; include notice |
-| LibRaw | LGPL-2.1 or CDDL-1.0 (alternative) | Planned Phase 3; choose LGPL-2.1; dynamic linking; notices/source offer |
+| libheif | LGPL-3.0 | Shipped with native still builds; dynamic linking; notices/source offer |
+| libde265 | LGPL-3.0 | Shipped with native still builds; dynamic linking; notices/source offer |
+| dav1d | BSD-2-Clause | Shipped with native still builds; include notice |
+| LibRaw | LGPL-2.1 or CDDL-1.0 (alternative) | Shipped with native still builds; choose LGPL-2.1; dynamic linking; notices/source offer |
 | flutter_secure_storage | BSD-style | Include notice |
 | webview_flutter | BSD-style | Include notice |
 | local_auth, wakelock_plus, window_manager, launch_at_startup | Permissive (BSD/MIT/Apache-2.0) | Generate notices |
@@ -62,7 +59,7 @@ compliant:
 - Decoders required by the product (H.264, HEVC, AV1, VP9, ProRes, common audio) are available in
   LGPL configurations, subject to the chosen build.
 - Pin the build and record its configuration in `licensing.md`/build scripts.
-- Media_kit’s bundled libmpv builds must be verified to be LGPL variants before release.
+- Use LGPL-only libmpv builds.
 - If a codec requires a GPL component, omit it or obtain a different license; do not silently ship
   a GPL build.
 
@@ -75,10 +72,10 @@ compliant:
 - CEF helper processes and resources must be included in the desktop package.
 - Keep CEF updated for security; review release notes for licensing changes.
 
-## 6. Native still decoders (planned Phase 3)
+## 6. Native still decoders
 
-This is the planned Phase 3 dependency set. The libraries are not bundled yet; until they are, the app
-falls back to Immich previews for HEIC/AVIF/RAW.
+The native still build uses these libraries. When they are absent, the app falls back to Immich
+previews for HEIC/AVIF/RAW.
 
 - libheif: LGPL-3.0. HEIC/AVIF container and decode API. Dynamic linking, notices, source offer.
 - libde265: LGPL-3.0. HEVC/HEIC codec used by libheif. Dynamic linking, notices, source offer.
@@ -92,8 +89,8 @@ falls back to Immich previews for HEIC/AVIF/RAW.
   copied to the packaged `licenses/` directory).
 - x265 and AOM encoders are intentionally excluded; no encoding capability is added. Keep them out of
   every build script.
-- ProRAW is a DNG variant processed through LibRaw; no Adobe SDK is required for the planned path.
-  Validate support and document any limitations.
+- ProRAW is a DNG variant processed through LibRaw; no Adobe SDK is required. Support depends on the
+  LibRaw version and the camera model.
 
 ## 7. Patents and codecs
 
@@ -115,15 +112,15 @@ Copyright licenses do not grant patent licenses for codecs.
   license and installs only local ZIPs with explicit consent.
 - No plugin may bundle GPL/native code through the plugin format (native binaries are rejected).
 
-## 9. Release compliance checklist
+## 9. Distribution requirements
 
-- [ ] Root `LICENSE` present.
-- [ ] `THIRD_PARTY_NOTICES.md` generated for all shipped packages and native libraries.
-- [ ] CEF/Chromium license files included in desktop packages.
-- [ ] LGPL source offer / source archive available for the exact library versions.
-- [ ] Android shared-library linking verified.
-- [ ] FFmpeg/libmpv builds verified LGPL-only.
-- [ ] No GPL-only codecs or tools shipped.
-- [ ] Plugin reference bundles declare MIT.
-- [ ] HDR/Dolby claims reviewed; only SDR tone-mapping documented.
-- [ ] App stores/distribution pages include license and patent disclaimers.
+- Include the root `LICENSE`.
+- Ship `THIRD_PARTY_NOTICES.md` for all shipped packages and native libraries.
+- Include CEF/Chromium license files in desktop packages.
+- Provide an LGPL source offer or source archive for the exact library versions.
+- Link Android native libraries dynamically.
+- Use LGPL-only FFmpeg/libmpv builds.
+- Do not ship GPL-only codecs or tools.
+- Bundled example plugins declare MIT.
+- Document only SDR tone-mapping; do not claim HDR or Dolby Vision.
+- Include license and patent disclaimers on distribution pages.

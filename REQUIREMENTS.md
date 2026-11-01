@@ -1,15 +1,8 @@
 # Photo Frame Requirements
 
-Status: Draft v0.4 (Phase 4 overlay/plugin decisions applied)
-Applies to: Photo Frame cross-platform photo frame (`com.rincew1nd.photoframe`)
-Related docs: [`Docs/README.md`](Docs/README.md), [`Docs/requirements-alignment.md`](Docs/requirements-alignment.md)
-
-This document defines product requirements. It is the source of truth for what the
-app must do; implementation detail belongs in the technical documentation. Existing
-behaviour is preserved unless a requirement below explicitly changes it.
-
-The original Android-only application (`com.dav3.immichframe`) remains a separate
-product. This document now applies to the greenfield cross-platform application.
+This document defines product requirements for Photo Frame (`com.rincew1nd.photoframe`). It is the
+source of truth for what the app must do; implementation detail belongs in the technical
+documentation.
 
 Priority keywords:
 
@@ -22,7 +15,7 @@ Priority keywords:
 | Platform | V1 status |
 |---|---|
 | Windows 10/11 x64 | Supported |
-| Linux x64 (Ubuntu/Debian) | Supported; X11 primary; Wayland unvalidated (no Linux host) |
+| Linux x64 (Ubuntu/Debian) | Supported; X11 primary; Wayland unvalidated |
 | Android 8.0+ (API 26) | Supported |
 | iOS, macOS | Out of scope |
 | Raspberry Pi / Linux ARM64 | Out of scope |
@@ -73,7 +66,7 @@ These capabilities already exist and must not regress.
 | MR-01 | The user can independently show or hide **Photos**, **Live Photos**, and **Videos**. The filter is multi-select and persists across restarts. | MUST |
 | MR-02 | At least one media type must remain selected. Disabling the last selected type must be prevented. | MUST |
 | MR-03 | A Live Photo is classified as **Live Photo**, not Photos. Animated GIFs are classified as **Photos**. | MUST |
-| MR-04 | All three types are enabled by default on a fresh install. No migration from the legacy app is performed; the legacy "Skip Videos" value is not read. | MUST |
+| MR-04 | All three types are enabled by default on a fresh install. No legacy settings migration is performed. | MUST |
 | MR-05 | When `asset.download` is denied, **Videos** is locked off with an explanatory hint. Live Photos remain available. | MUST |
 | MR-06 | The existing standalone "Skip Videos" toggle is replaced by the type filter. | MUST |
 
@@ -126,19 +119,6 @@ These capabilities already exist and must not regress.
 ---
 
 ## 3. Modular Plugin System
-
-### 3.0 Implementation status (2026-11-01)
-
-Phase 4 is implemented: manifest/ZIP validation, DB v4, the plugin store/seeder, loopback host,
-webview adapters, snapshot/bridge/session, plugin management UI, slideshow placement with
-drag/resize/grid, and bundled example plugins. Every overlay — including clock, weather, and
-metadata — is a plugin rendered by the host, with its own settings screen and draggable/resizable
-placement. The compiled Flutter overlays and their legacy `OverlaySettings` configuration have been
-removed; plugins are the only overlay system.
-
-The cached `tags` field is always empty because sync never populates it; tag support requires a sync
-change or an explicit requirement amendment. Weather for plugins is fetched through
-`SlideshowController.refreshWeatherAt()` using the weather plugin's own settings.
 
 ### 3.1 Model and package format
 
@@ -251,7 +231,7 @@ the photo library, the API key, the server URL, or credentials.
 | PLG-57 | External links are intercepted and opened in the system browser after confirmation. `file:`, `javascript:`, `intent:`, `data:` navigation, popups, and in-app navigation are blocked. | MUST |
 | PLG-58 | The host bridge and snapshot are versioned (v1). Plugin storage is namespaced per instance, size-limited, and removed on uninstall. Actions are declared, user-granted, and rate-limited (default 10/minute). | MUST |
 | PLG-59 | A failed, hung, or repeatedly erroring plugin is hidden/disabled and logged; it must not block the slideshow. Load timeout defaults to 10 seconds; repeated failures within five minutes disable the plugin. | MUST |
-| PLG-60 | On Android devices below the WebView baseline (Chromium 100+), plugins are disabled with an explanatory message. Because all overlays are plugins, the slideshow continues without overlays on those devices. Desktop plugin rendering targets CEF 149; Phase 0 found that `webview_cef` 0.6.2 exposes no transparency/background API, so CEF/OSR transparency must be patched or replaced and verified before Phase 4 host work. | MUST |
+| PLG-60 | On Android devices below the WebView baseline (Chromium 100+), plugins are disabled with an explanatory message. Because all overlays are plugins, the slideshow continues without overlays on those devices. Desktop plugin rendering uses CEF 149 through the patched `webview_cef` fork, which provides transparency and input. | MUST |
 | PLG-61 | The manifest declares the snapshot sections a plugin needs (`inputs`); the host delivers only those sections plus mandatory app/time data. The install/details UI discloses the requested inputs. | MUST |
 
 ---
@@ -278,11 +258,11 @@ the photo library, the API key, the server URL, or credentials.
 |---|---|---|
 | NFR-01 | The slideshow starts without waiting for plugin or overlay initialization. | MUST |
 | NFR-02 | Plugin updates at 1 Hz must not cause visible slideshow frame drops on supported devices. Use coalesced state, per-instance small webviews, and low-rate OSR. | MUST |
-| NFR-03 | The app must run for days without leaking memory, file handles, or player instances; soak targets are 24 hours for Phase 2 and 72 hours for the release gate. | MUST |
+| NFR-03 | The app must run for days without leaking memory, file handles, or player instances; the soak target is 72 hours. | MUST |
 | NFR-04 | Network loss, server downtime, album deletion, and malformed media must degrade gracefully without crashing. | MUST |
 | NFR-05 | All new settings and plugin state survive app restart and normal process death. | MUST |
 | NFR-06 | New UI strings are added to all supported locales; missing translations fall back to English. | MUST |
-| NFR-07 | The app must remain compatible with Android 8.0 (API 26) and above. Plugin rendering requires system WebView/Chromium 100+ on Android; below that baseline plugins (and therefore all overlays) are disabled with an explanation while the slideshow continues. Desktop plugin rendering targets CEF 149, but Phase 0 found `webview_cef` 0.6.2 lacks a transparency API; the gate must be resolved before plugins ship. | MUST |
+| NFR-07 | The app must remain compatible with Android 8.0 (API 26) and above. Plugin rendering requires system WebView/Chromium 100+ on Android; below that baseline plugins (and therefore all overlays) are disabled with an explanation while the slideshow continues. Desktop plugin rendering uses CEF 149 through the patched `webview_cef` fork. | MUST |
 | NFR-08 | Plugin permissions, network access, and data exposure are disclosed in the settings UI. | MUST |
 | NFR-09 | No plugin may access the Immich API directly; all app data comes through the versioned snapshot. | MUST |
 | NFR-10 | Documentation is updated in the same change as any requirement-affecting code. | MUST |
@@ -326,8 +306,6 @@ the photo library, the API key, the server URL, or credentials.
 
 ## 8. Resolved Decisions
 
-The Phase 0 product decisions formerly tracked as open questions:
-
 | Question | Decision |
 |---|---|
 | Plugin scripts | Sandboxed HTML/CSS/JavaScript; not Dart, because runtime-installed Dart cannot be safely sandboxed and would expose the host process |
@@ -341,9 +319,6 @@ The Phase 0 product decisions formerly tracked as open questions:
 | Plugin settings | Each installed plugin has its own settings screen rendered from its manifest schema |
 | Plugin playback actions | Declared and user-granted next/previous/pause/mute/open settings/open media selection; rate-limited |
 | Network allowlist | No domain allowlist in v1; host-proxied network with explicit permission and documented residual risk |
-
-Remaining product decisions (not blocking implementation): final display name/branding, final locale list, desktop installer
-formats, app icon, Windows Hello/Linux biometric behaviour, desktop update UX, and post-v1 multiple instances per plugin.
 
 ---
 
