@@ -1,32 +1,31 @@
 # Third-party sources
 
-## webview_cef
+## Submodules
 
-Vendored copy of `webview_cef` 0.6.2 (Apache-2.0), selected via the
-`dependency_overrides` path in `pubspec.yaml`.
+These packages are pinned git submodules:
 
-Local patches support transparent plugin overlays on Windows:
+| Path | Upstream | Why |
+|---|---|---|
+| `third_party/webview_cef` | [hlwhl/webview_cef](https://github.com/hlwhl/webview_cef) 0.6.2 | Transparent plugin overlays on Windows |
+| `third_party/flutter_secure_storage_windows` | [flutter_secure_storage_windows](https://pub.dev/packages/flutter_secure_storage_windows) | Windows credential storage without ATL |
 
-- transparent offscreen browser background;
-- software pixel-buffer rendering when the GPU shared-texture path fails;
-- CEF subprocess and message-loop hooks in `windows/runner/main.cpp`;
-- input, IME, and windowless-rendering fixes.
+Both are selected through `dependency_overrides` in `pubspec.yaml`. Clone with
+submodules:
 
-The downloaded CEF runtime under `third/cef/` and `third/prebuilt.zip` is
-ignored and fetched by CMake. Do not commit it.
+```bash
+git clone --recurse-submodules <repository-url>
+# or, in an existing clone:
+git submodule update --init --recursive
+```
 
-Upstream: <https://github.com/hlwhl/webview_cef>. There is currently no remote
-fork for these local patches, so the patched source is tracked directly here.
-If a fork is published, replace this directory with a pinned submodule and keep
-the patch commits in that fork.
+The `webview_cef` fork contains the transparency, software pixel-buffer,
+subprocess, input, and IME fixes that Photo Frame needs. The secure-storage
+fork uses the package's Dart FFI Windows implementation and Windows Credential
+Manager instead of the ATL-native plugin.
 
-## flutter_secure_storage_windows
+## Native still decoders
 
-Tracked local patch for the Windows secure-storage plugin, selected via
-`dependency_overrides`.
-
-## stills
-
-Native HEIC/AVIF/RAW decoder build output. Ignored; reproduce with
-`scripts/fetch-stills-deps.ps1` / `.sh` and
-`scripts/build-libheif-android.sh`.
+`third_party/stills/` is generated build output for HEIC, AVIF, and RAW
+decoding. It is not committed. Build it with `scripts/fetch-stills-deps.ps1`
+(Windows), `scripts/fetch-stills-deps.sh` (Linux), or
+`scripts/build-libheif-android.sh` (Android). CI caches the directory.
